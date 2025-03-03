@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Brute Force Password Cracker</title>
+    <style>
+        body { font-family: Arial, sans-serif; text-align: center; }
+        #output { white-space: pre-wrap; font-family: monospace; }
+    </style>
+</head>
+<body>
+    <h1>Brute Force Password Cracker</h1>
+    <input type="text" id="target" placeholder="Enter password to crack">
+    <button onclick="startCracking()">Start</button>
+    <p id="status">Attempts: 0</p>
+    <p id="time">Elapsed Time: 0s</p>
+    <p id="output"></p>
+    
+    <script>
+        let startTime, attempts = 0;
+        let numWorker, charWorker;
+
+        function startCracking() {
+            const target = document.getElementById('target').value;
+            if (!target) return alert('Enter a password to crack!');
+            
+            attempts = 0;
+            startTime = performance.now();
+            document.getElementById('status').innerText = "Attempts: 0";
+            document.getElementById('time').innerText = "Elapsed Time: 0s";
+            document.getElementById('output').innerText = "Cracking...";
+            
+            // Initialize web workers
+            numWorker = new Worker(URL.createObjectURL(new Blob([`(${numberCrackerWorker.toString()})()`], { type: 'application/javascript' })));
+            charWorker = new Worker(URL.createObjectURL(new Blob([`(${charCrackerWorker.toString()})()`], { type: 'application/javascript' })));
+            
+            numWorker.onmessage = charWorker.onmessage = function(e) {
+                attempts += e.data.attempts;
+                document.getElementById('status').innerText = `Attempts: ${attempts.toLocaleString()}`;
+                document.getElementById('time').innerText = `Elapsed Time: ${(performance.now() - startTime) / 1000}s`;
+                
+                if (e.data.found) {
+                    document.getElementById('output').innerText = `Password Found: ${e.data.password}`;
+                    numWorker.terminate();
+                    charWorker.terminate();
+                }
+            };
+            
+            numWorker.postMessage(target);
+            charWorker.postMessage(target);
+        }
+
+        function numberCrackerWorker() {
+            onmessage = function(e) {
+                const target = e.data;
+                let attempts = 0;
+                let guess = "";
+                while (true) {
+                    guess = (attempts++).toString();
+                    if (guess === target) {
+                        postMessage({ found: true, password: guess, attempts });
+                        break;
+                    }
+                    if (attempts % 1000000 === 0) postMessage({ attempts });
+                }
+            };
+        }
+
+        function charCrackerWorker() {
+            onmessage = function(e) {
+                const target = e.data;
+                let attempts = 0;
+                const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()-";
+                let guess = "";
+                function generateCombination(length) {
+                    let res = "";
+                    for (let i = 0; i < length; i++) res += chars[Math.floor(Math.random() * chars.length)];
+                    return res;
+                }
+                while (true) {
+                    guess = generateCombination(target.length);
+                    attempts++;
+                    if (guess === target) {
+                        postMessage({ found: true, password: guess, attempts });
+                        break;
+                    }
+                    if (attempts % 1000000 === 0) postMessage({ attempts });
+                }
+            };
+        }
+    </script>
+</body>
+</html>
