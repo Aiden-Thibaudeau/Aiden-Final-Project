@@ -1,13 +1,17 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Platform Game</title>
-  <link rel="stylesheet" href="style.css">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>2D Fighting Game</title>
+  <link rel="stylesheet" href="style.css" />
 </head>
 <body>
+    
   <canvas id="gameCanvas"></canvas>
+  <div id="player1Stock" class="stock-container player1"></div>
+  <div id="player2Stock" class="stock-container player2"></div>  
+  <button id="restartBtn" style="position:absolute; top:50%; left:50%; transform:translate(-50%, -50%); display:none; font-size:24px; padding:10px 20px;">Restart</button>
 
   <script src="game.js"></script>
 </body>
