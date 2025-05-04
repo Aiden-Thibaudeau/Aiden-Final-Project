@@ -1,23 +1,20 @@
 let gameOver = false;
 const restartBtn = document.getElementById('restartBtn');
 
-// Get the canvas element and set up its context
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 
-// Game configuration variables
 const GRAVITY = 1.5;
 const JUMP_STRENGTH = 25;
 const PLAYER_SPEED = 8;
 const MAX_JUMPS = 2;
-const PUNCH_DURATION = 10;  // Frames
-const PUNCH_COOLDOWN = 30;  // Frames between punches
-const KNOCKBACK_FORCE = 35; // Horizontal knockback force
+const PUNCH_DURATION = 10;
+const PUNCH_COOLDOWN = 30;
+const KNOCKBACK_FORCE = 35;
 
 canvas.width = window.innerWidth;
 canvas.height = window.innerHeight;
 
-// Define the platform object
 const platform = {
   x: canvas.width / 4,
   y: canvas.height - 500,
@@ -25,7 +22,6 @@ const platform = {
   height: 100,
 };
 
-// Function to create players
 function createPlayer(x) {
   return {
     x: x,
@@ -41,21 +37,19 @@ function createPlayer(x) {
     punching: false,
     punchTimer: 0,
     punchCooldown: 0,
-    facing: 1,  // 1 = right, -1 = left
+    facing: 1,
     knockbackDx: 0,
     stocks: 3,
+    projectileCooldown: 0,
   };
 }
 
-// Players
 const player1 = createPlayer(1000);
 const player2 = createPlayer(platform.x + platform.width - 100);
-
 
 updateStockDisplay(player1);
 updateStockDisplay(player2);
 
-// Input tracking
 const keys = {
   ArrowLeft: false,
   ArrowRight: false,
@@ -65,19 +59,19 @@ const keys = {
   w: false,
   f: false,
   '.': false,
+  g: false,
+  '/': false,
 };
 
 window.addEventListener('keydown', (e) => {
   if (e.key in keys) keys[e.key] = true;
 
-  // Jumping
   if (e.key === 'w' && player1.jumpsLeft > 0) {
     player1.dy = -JUMP_STRENGTH;
     player1.jumping = true;
     player1.grounded = false;
     player1.jumpsLeft--;
   }
-
   if (e.key === 'ArrowUp' && player2.jumpsLeft > 0) {
     player2.dy = -JUMP_STRENGTH;
     player2.jumping = true;
@@ -90,7 +84,6 @@ window.addEventListener('keyup', (e) => {
   if (e.key in keys) keys[e.key] = false;
 });
 
-// Move players
 function movePlayer(player, leftKey, rightKey) {
   let moveDx = 0;
   if (keys[leftKey]) {
@@ -100,32 +93,20 @@ function movePlayer(player, leftKey, rightKey) {
     moveDx = player.speed;
     player.facing = 1;
   }
-
-  // Combine movement and knockback
   player.dx = moveDx + player.knockbackDx;
-
-  // Apply horizontal movement
   player.x += player.dx;
-
-  // Clamp within canvas
   if (player.x < 0) player.x = 0;
   if (player.x + player.width > canvas.width) player.x = canvas.width - player.width;
 
-  // Gradually reduce knockback
   player.knockbackDx *= 0.8;
   if (Math.abs(player.knockbackDx) < 0.1) player.knockbackDx = 0;
 }
 
-
-
-
-
-// Gravity + Platform
 function applyGravity(player) {
   player.dy += GRAVITY;
   const nextY = player.y + player.dy;
 
-  const isFallingOntoPlatform = (
+  const onPlatform = (
     player.dy > 0 &&
     player.y + player.height <= platform.y &&
     nextY + player.height >= platform.y &&
@@ -133,7 +114,7 @@ function applyGravity(player) {
     player.x < platform.x + platform.width
   );
 
-  if (isFallingOntoPlatform) {
+  if (onPlatform) {
     player.dy = 0;
     player.y = platform.y - player.height;
     player.grounded = true;
@@ -145,7 +126,6 @@ function applyGravity(player) {
 
   player.y += player.dy;
 }
-
 
 function updateStockDisplay(player) {
   const containerId = player === player1 ? 'player1Stock' : 'player2Stock';
@@ -160,14 +140,11 @@ function updateStockDisplay(player) {
   }
 }
 
-// Fall check
 function checkFallOff(player, spawnX) {
   if (player.y > canvas.height) {
     if (player.stocks > 1) {
       player.stocks--;
       updateStockDisplay(player);
-
-      // Respawn
       player.x = spawnX;
       player.y = platform.y - player.height;
       player.dy = 0;
@@ -177,60 +154,49 @@ function checkFallOff(player, spawnX) {
     } else {
       player.stocks = 0;
       updateStockDisplay(player);
-      // Optional: Handle game over
     }
   }
 }
 
-
-// Punch handling
 function handlePunching(attacker, defender, punchKey) {
-  // Start punch if key pressed and not cooling down
   if (keys[punchKey] && attacker.punchCooldown <= 0 && !attacker.punching) {
     attacker.punching = true;
     attacker.punchTimer = PUNCH_DURATION;
     attacker.punchCooldown = PUNCH_COOLDOWN;
   }
 
-  // Update punch timer
   if (attacker.punching) {
     attacker.punchTimer--;
     if (attacker.punchTimer <= 0) {
       attacker.punching = false;
     } else {
-      // Punch hitbox (in front of player)
-      const punchWidth = 30;
+      const punchWidth = 60;
       const punchHeight = 30;
       const punchX = attacker.facing === 1 ? attacker.x + attacker.width : attacker.x - punchWidth;
       const punchY = attacker.y + attacker.height / 4;
 
-      // Collision with defender
       if (
         punchX < defender.x + defender.width &&
         punchX + punchWidth > defender.x &&
         punchY < defender.y + defender.height &&
         punchY + punchHeight > defender.y
       ) {
-        // Apply knockback away from attacker
         const knockDirection = attacker.facing;
         defender.knockbackDx = knockDirection * KNOCKBACK_FORCE;
-        defender.dy = -10; // Knock upward
-        // Apply additional backward movement for realism
+        defender.dy = -10;
       }
     }
   }
 
-  // Reduce cooldown
   if (attacker.punchCooldown > 0) {
     attacker.punchCooldown--;
   }
 }
 
-// Draw punch
 function drawPunch(player, color) {
   if (!player.punching) return;
 
-  const punchWidth = 30;
+  const punchWidth = 60;
   const punchHeight = 30;
   const punchX = player.facing === 1 ? player.x + player.width : player.x - punchWidth;
   const punchY = player.y + player.height / 4;
@@ -239,8 +205,61 @@ function drawPunch(player, color) {
   ctx.fillRect(punchX, punchY, punchWidth, punchHeight);
 }
 
-// Reset player function moved outside updateGame
-// Reset player function moved outside updateGame
+const projectiles = [];
+const PROJECTILE_SPEED = 15;
+const PROJECTILE_COOLDOWN = 30;
+const PROJECTILE_KNOCKBACK = 25;
+
+function shootProjectile(player, key) {
+  if (keys[key] && player.projectileCooldown <= 0) {
+    const dir = player.facing;
+    projectiles.push({
+      x: player.x + (dir === 1 ? player.width : -20),
+      y: player.y + player.height / 2 - 5,
+      width: 20,
+      height: 10,
+      dx: PROJECTILE_SPEED * dir,
+      owner: player
+    });
+    player.projectileCooldown = PROJECTILE_COOLDOWN;
+  }
+
+  if (player.projectileCooldown > 0) {
+    player.projectileCooldown--;
+  }
+}
+
+function updateProjectiles() {
+  for (let i = projectiles.length - 1; i >= 0; i--) {
+    const p = projectiles[i];
+    p.x += p.dx;
+
+    const target = p.owner === player1 ? player2 : player1;
+    if (
+      p.x < target.x + target.width &&
+      p.x + p.width > target.x &&
+      p.y < target.y + target.height &&
+      p.y + p.height > target.y
+    ) {
+      target.knockbackDx = Math.sign(p.dx) * PROJECTILE_KNOCKBACK;
+      target.dy = -8;
+      projectiles.splice(i, 1);
+      continue;
+    }
+
+    if (p.x < 0 || p.x > canvas.width) {
+      projectiles.splice(i, 1);
+    }
+  }
+}
+
+function drawProjectiles() {
+  ctx.fillStyle = 'gold';
+  projectiles.forEach(p => {
+    ctx.fillRect(p.x, p.y, p.width, p.height);
+  });
+}
+
 function resetPlayer(player, spawnX, spawnY) {
   player.x = spawnX;
   player.y = spawnY;
@@ -249,20 +268,17 @@ function resetPlayer(player, spawnX, spawnY) {
   player.jumping = false;
   player.grounded = true;
   player.jumpsLeft = MAX_JUMPS;
-  player.stocks = 3;  // Reset stocks to 3
-  updateStockDisplay(player);  // Update the display of stocks
-  resetKeyStates();  // Reset key states
+  player.stocks = 3;
+  updateStockDisplay(player);
+  resetKeyStates();
 }
 
-// Function to reset key states
 function resetKeyStates() {
-  // Explicitly set the key states to false to prevent movement after respawn
   for (const key in keys) {
     keys[key] = false;
   }
 }
 
-// Game state
 function updateGame() {
   movePlayer(player1, 'a', 'd');
   movePlayer(player2, 'ArrowLeft', 'ArrowRight');
@@ -279,10 +295,15 @@ function updateGame() {
   handlePunching(player1, player2, 'f');
   handlePunching(player2, player1, '.');
 
+  shootProjectile(player1, 'g');
+  shootProjectile(player2, '/');
+
+  updateProjectiles();
+
   if (!gameOver && (player1.stocks <= 0 || player2.stocks <= 0)) {
     gameOver = true;
     restartBtn.style.display = 'block';
-  }  
+  }
 
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   drawPlatform();
@@ -290,16 +311,15 @@ function updateGame() {
   drawPlayer(player2, '#4682B4');
   drawPunch(player1, '#FF0000');
   drawPunch(player2, '#0000FF');
+  drawProjectiles();
 }
 
 restartBtn.addEventListener('click', () => {
   gameOver = false;
   restartBtn.style.display = 'none';
-
   resetPlayer(player1, 1000, platform.y - player1.height);
   resetPlayer(player2, platform.x + platform.width - 100, platform.y - player2.height);
-
-  requestAnimationFrame(gameLoop);  // Resume game
+  requestAnimationFrame(gameLoop);
 });
 
 function drawWinnerText() {
@@ -312,27 +332,22 @@ function drawWinnerText() {
   ctx.fillText(`${player1.stocks <= 0 ? 'Blue' : 'Red'} Wins!`, canvas.width / 2, canvas.height / 2 - 60);
 }
 
-// Draw player
 function drawPlayer(player, color) {
   ctx.fillStyle = color;
   ctx.fillRect(player.x, player.y, player.width, player.height);
 }
 
-// Draw platform
 function drawPlatform() {
   ctx.fillStyle = '#8B4513';
   ctx.fillRect(platform.x, platform.y, platform.width, platform.height);
 }
 
-// Game loop
 function gameLoop() {
   updateGame();
-
   if (gameOver) {
     drawWinnerText();
-    return; // Stop game updates
+    return;
   }
-
   requestAnimationFrame(gameLoop);
 }
 
