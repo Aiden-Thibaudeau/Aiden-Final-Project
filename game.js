@@ -4,20 +4,24 @@ const restartBtn = document.getElementById('restartBtn');
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 
-const GRAVITY = 1.5;
-const JUMP_STRENGTH = 25;
-const PLAYER_SPEED = 8;
+const GRAVITY = 2;
+const JUMP_STRENGTH = 20;
+const PLAYER_SPEED = 12;
 const MAX_JUMPS = 2;
 const PUNCH_DURATION = 10;
-const PUNCH_COOLDOWN = 30;
+const PUNCH_COOLDOWN = 20;
 const KNOCKBACK_FORCE = 35;
+const projectiles = [];
+const PROJECTILE_SPEED = 15;
+const PROJECTILE_COOLDOWN = 20;
+const PROJECTILE_KNOCKBACK = 25;
 
 canvas.width = window.innerWidth;
 canvas.height = window.innerHeight;
 
 const platform = {
   x: canvas.width / 4,
-  y: canvas.height - 500,
+  y: canvas.height / 2,
   width: canvas.width / 2,
   height: 100,
 };
@@ -44,8 +48,8 @@ function createPlayer(x) {
   };
 }
 
-const player1 = createPlayer(1000);
-const player2 = createPlayer(platform.x + platform.width - 100);
+const player1 = createPlayer(platform.x + platform.width/7);
+const player2 = createPlayer(platform.x + platform.width -100);
 
 updateStockDisplay(player1);
 updateStockDisplay(player2);
@@ -205,11 +209,6 @@ function drawPunch(player, color) {
   ctx.fillRect(punchX, punchY, punchWidth, punchHeight);
 }
 
-const projectiles = [];
-const PROJECTILE_SPEED = 15;
-const PROJECTILE_COOLDOWN = 30;
-const PROJECTILE_KNOCKBACK = 25;
-
 function shootProjectile(player, key) {
   if (keys[key] && player.projectileCooldown <= 0) {
     const dir = player.facing;
@@ -289,7 +288,7 @@ function updateGame() {
   player1.dx *= 0.95;
   player2.dx *= 0.95;
 
-  checkFallOff(player1, 1000);
+  checkFallOff(player1, platform.x + platform.width/7);
   checkFallOff(player2, platform.x + platform.width - 100);
 
   handlePunching(player1, player2, 'f');
@@ -317,7 +316,7 @@ function updateGame() {
 restartBtn.addEventListener('click', () => {
   gameOver = false;
   restartBtn.style.display = 'none';
-  resetPlayer(player1, 1000, platform.y - player1.height);
+  resetPlayer(player1, platform.x + platform.width/7, platform.y - player1.height);
   resetPlayer(player2, platform.x + platform.width - 100, platform.y - player2.height);
   requestAnimationFrame(gameLoop);
 });
