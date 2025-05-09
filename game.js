@@ -15,7 +15,6 @@ const projectiles = [];
 const PROJECTILE_SPEED = 15;
 const PROJECTILE_COOLDOWN = 20;
 const PROJECTILE_KNOCKBACK = 10;
-KNOCKBACK_MULTIPLIER = 1;
 
 canvas.width = window.innerWidth;
 canvas.height = window.innerHeight;
@@ -46,6 +45,7 @@ function createPlayer(x) {
     knockbackDx: 0,
     stocks: 3,
     projectileCooldown: 0,
+    knockbackMultiplier: 1,
   };
 }
 
@@ -179,7 +179,7 @@ function handlePunching(attacker, defender, punchKey) {
       const punchHeight = 30;
       const punchX = attacker.facing === 1 ? attacker.x + attacker.width : attacker.x - punchWidth;
       const punchY = attacker.y + attacker.height / 4;
-
+  
       if (
         punchX < defender.x + defender.width &&
         punchX + punchWidth > defender.x &&
@@ -187,12 +187,13 @@ function handlePunching(attacker, defender, punchKey) {
         punchY + punchHeight > defender.y
       ) {
         const knockDirection = attacker.facing;
-        defender.knockbackDx = knockDirection * (KNOCKBACK_FORCE*KNOCKBACK_MULTIPLIER);
+        defender.knockbackDx = knockDirection * (KNOCKBACK_FORCE * defender.knockbackMultiplier);
         defender.dy = -10;
-        KNOCKBACK_MULTIPLIER += 0.1;
+        defender.knockbackMultiplier = Math.min(defender.knockbackMultiplier + 0.1, 10);
       }
     }
   }
+  
 
   if (attacker.punchCooldown > 0) {
     attacker.punchCooldown--;
@@ -242,11 +243,15 @@ function updateProjectiles() {
       p.y < target.y + target.height &&
       p.y + p.height > target.y
     ) {
-      target.knockbackDx = Math.sign(p.dx) * PROJECTILE_KNOCKBACK;
-      target.dy = -8;
+      // Apply knockback using owner's multiplier
+      target.knockbackDx = Math.sign(p.dx) * (PROJECTILE_KNOCKBACK * target.knockbackMultiplier);
+    target.dy = -8;
+    target.knockbackMultiplier = Math.min(target.knockbackMultiplier + 0.1, 10);
+
+    
       projectiles.splice(i, 1);
       continue;
-    }
+    }    
 
     if (p.x < 0 || p.x > canvas.width) {
       projectiles.splice(i, 1);
@@ -270,6 +275,7 @@ function resetPlayer(player, spawnX, spawnY) {
   player.grounded = true;
   player.jumpsLeft = MAX_JUMPS;
   player.stocks = 3;
+  player.knockbackMultiplier = 1;
   updateStockDisplay(player);
   resetKeyStates();
 }
@@ -333,10 +339,27 @@ function drawWinnerText() {
   ctx.fillText(`${player1.stocks <= 0 ? 'Blue' : 'Red'} Wins!`, canvas.width / 2, canvas.height / 2 - 60);
 }
 
-function drawPlayer(player, color) {
+function getDarkenedColor(baseColor, multiplier) {
+  const maxMultiplier = 10;
+  const factor = Math.min(multiplier / maxMultiplier, 1); // clamp between 0 and 1
+
+  const base = {
+    '#FF6347': [255, 99, 71],     // red
+    '#4682B4': [70, 130, 180],    // blue
+  };
+
+  const [r, g, b] = base[baseColor];
+  const darken = 1 - factor * 0.7; // reduce brightness by up to 70%
+
+  return `rgb(${r * darken}, ${g * darken}, ${b * darken})`;
+}
+
+function drawPlayer(player, baseColor) {
+  const color = getDarkenedColor(baseColor, player.knockbackMultiplier);
   ctx.fillStyle = color;
   ctx.fillRect(player.x, player.y, player.width, player.height);
 }
+
 
 function drawPlatform() {
   ctx.fillStyle = '#8B4513';
