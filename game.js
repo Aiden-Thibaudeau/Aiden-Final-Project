@@ -6,13 +6,13 @@ const ctx = canvas.getContext('2d');
 
 const GRAVITY = 2;
 const JUMP_STRENGTH = 20;
-const PLAYER_SPEED = 12;
+const PLAYER_SPEED = 8;
 const MAX_JUMPS = 2;
 const PUNCH_DURATION = 10;
 const PUNCH_COOLDOWN = 20;
 const KNOCKBACK_FORCE = 15;
 const projectiles = [];
-const PROJECTILE_SPEED = 15;
+const PROJECTILE_SPEED = 12;
 const PROJECTILE_COOLDOWN = 20;
 const PROJECTILE_KNOCKBACK = 10;
 
@@ -56,16 +56,16 @@ updateStockDisplay(player1);
 updateStockDisplay(player2);
 
 const keys = {
-  ArrowLeft: false,
-  ArrowRight: false,
-  ArrowUp: false,
+  '4': false,
+  '6': false,
+  '8': false,
   a: false,
   d: false,
   w: false,
-  f: false,
-  '.': false,
-  g: false,
-  '/': false,
+  q: false,
+  '7': false,
+  e: false,
+  '9': false,
 };
 
 window.addEventListener('keydown', (e) => {
@@ -77,7 +77,7 @@ window.addEventListener('keydown', (e) => {
     player1.grounded = false;
     player1.jumpsLeft--;
   }
-  if (e.key === 'ArrowUp' && player2.jumpsLeft > 0) {
+  if (e.key === '8' && player2.jumpsLeft > 0) {
     player2.dy = -JUMP_STRENGTH;
     player2.jumping = true;
     player2.grounded = false;
@@ -145,6 +145,13 @@ function updateStockDisplay(player) {
   }
 }
 
+function updatePercentDisplay(player) {
+  const percentId = player === player1 ? 'player1Percent' : 'player2Percent';
+  const percentContainer = document.getElementById(percentId);
+
+  percentContainer.textContent = `${Math.round((player.knockbackMultiplier - 1) * 10)}%`;
+}
+
 function checkFallOff(player, spawnX) {
   if (player.y > canvas.height) {
     if (player.stocks > 1) {
@@ -156,6 +163,7 @@ function checkFallOff(player, spawnX) {
       player.jumping = false;
       player.grounded = true;
       player.jumpsLeft = MAX_JUMPS;
+      player.knockbackMultiplier = 1;
     } else {
       player.stocks = 0;
       updateStockDisplay(player);
@@ -189,7 +197,7 @@ function handlePunching(attacker, defender, punchKey) {
         const knockDirection = attacker.facing;
         defender.knockbackDx = knockDirection * (KNOCKBACK_FORCE * defender.knockbackMultiplier);
         defender.dy = -10;
-        defender.knockbackMultiplier = Math.min(defender.knockbackMultiplier + 0.1, 10);
+        defender.knockbackMultiplier = Math.min(defender.knockbackMultiplier + 0.3, 11);
       }
     }
   }
@@ -246,7 +254,7 @@ function updateProjectiles() {
       // Apply knockback using owner's multiplier
       target.knockbackDx = Math.sign(p.dx) * (PROJECTILE_KNOCKBACK * target.knockbackMultiplier);
     target.dy = -8;
-    target.knockbackMultiplier = Math.min(target.knockbackMultiplier + 0.1, 10);
+    target.knockbackMultiplier = Math.min(target.knockbackMultiplier + 0.2, 11);
 
     
       projectiles.splice(i, 1);
@@ -288,7 +296,7 @@ function resetKeyStates() {
 
 function updateGame() {
   movePlayer(player1, 'a', 'd');
-  movePlayer(player2, 'ArrowLeft', 'ArrowRight');
+  movePlayer(player2, '4', '6');
 
   applyGravity(player1);
   applyGravity(player2);
@@ -299,11 +307,11 @@ function updateGame() {
   checkFallOff(player1, platform.x + platform.width/7);
   checkFallOff(player2, platform.x + platform.width - 100);
 
-  handlePunching(player1, player2, 'f');
-  handlePunching(player2, player1, '.');
+  handlePunching(player1, player2, 'q');
+  handlePunching(player2, player1, '7');
 
-  shootProjectile(player1, 'g');
-  shootProjectile(player2, '/');
+  shootProjectile(player1, 'e');
+  shootProjectile(player2, '9');
 
   updateProjectiles();
 
@@ -368,6 +376,8 @@ function drawPlatform() {
 
 function gameLoop() {
   updateGame();
+updatePercentDisplay(player1);
+updatePercentDisplay(player2);
   if (gameOver) {
     drawWinnerText();
     return;
