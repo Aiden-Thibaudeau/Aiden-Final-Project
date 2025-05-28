@@ -1,388 +1,162 @@
-let gameOver = false;
-const restartBtn = document.getElementById('restartBtn');
+import { GAME_CONFIG } from './constants.js';
+import { Player } from './player.js';
+import { CombatSystem } from './combat.js';
+import { Renderer } from './renderer.js';
+import { InputHandler } from './input.js';
+import { UIManager } from './ui.js';
 
-const canvas = document.getElementById('gameCanvas');
-const ctx = canvas.getContext('2d');
-
-const GRAVITY = 2;
-const JUMP_STRENGTH = 20;
-const PLAYER_SPEED = 8;
-const MAX_JUMPS = 2;
-const PUNCH_DURATION = 10;
-const PUNCH_COOLDOWN = 20;
-const KNOCKBACK_FORCE = 15;
-const projectiles = [];
-const PROJECTILE_SPEED = 12;
-const PROJECTILE_COOLDOWN = 20;
-const PROJECTILE_KNOCKBACK = 10;
-
-canvas.width = window.innerWidth;
-canvas.height = window.innerHeight;
-
-const platform = {
-  x: canvas.width / 4,
-  y: canvas.height / 2,
-  width: canvas.width / 2,
-  height: 100,
-};
-
-function createPlayer(x) {
-  return {
-    x: x,
-    y: platform.y - 50,
-    width: 50,
-    height: 50,
-    speed: PLAYER_SPEED,
-    dx: 0,
-    dy: 0,
-    jumping: false,
-    grounded: false,
-    jumpsLeft: MAX_JUMPS,
-    punching: false,
-    punchTimer: 0,
-    punchCooldown: 0,
-    facing: 1,
-    knockbackDx: 0,
-    stocks: 3,
-    projectileCooldown: 0,
-    knockbackMultiplier: 1,
-  };
-}
-
-const player1 = createPlayer(platform.x + platform.width/7);
-const player2 = createPlayer(platform.x + platform.width -100);
-
-updateStockDisplay(player1);
-updateStockDisplay(player2);
-
-const keys = {
-  '4': false,
-  '6': false,
-  '8': false,
-  a: false,
-  d: false,
-  w: false,
-  q: false,
-  '7': false,
-  e: false,
-  '9': false,
-};
-
-window.addEventListener('keydown', (e) => {
-  if (e.key in keys) keys[e.key] = true;
-
-  if (e.key === 'w' && player1.jumpsLeft > 0) {
-    player1.dy = -JUMP_STRENGTH;
-    player1.jumping = true;
-    player1.grounded = false;
-    player1.jumpsLeft--;
-  }
-  if (e.key === '8' && player2.jumpsLeft > 0) {
-    player2.dy = -JUMP_STRENGTH;
-    player2.jumping = true;
-    player2.grounded = false;
-    player2.jumpsLeft--;
-  }
-});
-
-window.addEventListener('keyup', (e) => {
-  if (e.key in keys) keys[e.key] = false;
-});
-
-function movePlayer(player, leftKey, rightKey) {
-  let moveDx = 0;
-  if (keys[leftKey]) {
-    moveDx = -player.speed;
-    player.facing = -1;
-  } else if (keys[rightKey]) {
-    moveDx = player.speed;
-    player.facing = 1;
-  }
-  player.dx = moveDx + player.knockbackDx;
-  player.x += player.dx;
-  if (player.x < 0) player.x = 0;
-  if (player.x + player.width > canvas.width) player.x = canvas.width - player.width;
-
-  player.knockbackDx *= 0.8;
-  if (Math.abs(player.knockbackDx) < 0.1) player.knockbackDx = 0;
-}
-
-function applyGravity(player) {
-  player.dy += GRAVITY;
-  const nextY = player.y + player.dy;
-
-  const onPlatform = (
-    player.dy > 0 &&
-    player.y + player.height <= platform.y &&
-    nextY + player.height >= platform.y &&
-    player.x + player.width > platform.x &&
-    player.x < platform.x + platform.width
-  );
-
-  if (onPlatform) {
-    player.dy = 0;
-    player.y = platform.y - player.height;
-    player.grounded = true;
-    player.jumping = false;
-    player.jumpsLeft = MAX_JUMPS;
-  } else {
-    player.grounded = false;
-  }
-
-  player.y += player.dy;
-}
-
-function updateStockDisplay(player) {
-  const containerId = player === player1 ? 'player1Stock' : 'player2Stock';
-  const stockContainer = document.getElementById(containerId);
-
-  stockContainer.innerHTML = '';
-  for (let i = 0; i < player.stocks; i++) {
-    const heart = document.createElement('img');
-    heart.src = 'hearts.png';
-    heart.alt = 'Heart';
-    stockContainer.appendChild(heart);
-  }
-}
-
-function updatePercentDisplay(player) {
-  const percentId = player === player1 ? 'player1Percent' : 'player2Percent';
-  const percentContainer = document.getElementById(percentId);
-
-  percentContainer.textContent = `${Math.round((player.knockbackMultiplier - 1) * 10)}%`;
-}
-
-function checkFallOff(player, spawnX) {
-  if (player.y > canvas.height) {
-    if (player.stocks > 1) {
-      player.stocks--;
-      updateStockDisplay(player);
-      player.x = spawnX;
-      player.y = platform.y - player.height;
-      player.dy = 0;
-      player.jumping = false;
-      player.grounded = true;
-      player.jumpsLeft = MAX_JUMPS;
-      player.knockbackMultiplier = 1;
-    } else {
-      player.stocks = 0;
-      updateStockDisplay(player);
-    }
-  }
-}
-
-function handlePunching(attacker, defender, punchKey) {
-  if (keys[punchKey] && attacker.punchCooldown <= 0 && !attacker.punching) {
-    attacker.punching = true;
-    attacker.punchTimer = PUNCH_DURATION;
-    attacker.punchCooldown = PUNCH_COOLDOWN;
-  }
-
-  if (attacker.punching) {
-    attacker.punchTimer--;
-    if (attacker.punchTimer <= 0) {
-      attacker.punching = false;
-    } else {
-      const punchWidth = 60;
-      const punchHeight = 30;
-      const punchX = attacker.facing === 1 ? attacker.x + attacker.width : attacker.x - punchWidth;
-      const punchY = attacker.y + attacker.height / 4;
-  
-      if (
-        punchX < defender.x + defender.width &&
-        punchX + punchWidth > defender.x &&
-        punchY < defender.y + defender.height &&
-        punchY + punchHeight > defender.y
-      ) {
-        const knockDirection = attacker.facing;
-        defender.knockbackDx = knockDirection * (KNOCKBACK_FORCE * defender.knockbackMultiplier);
-        defender.dy = -10;
-        defender.knockbackMultiplier = Math.min(defender.knockbackMultiplier + 0.3, 11);
-      }
-    }
-  }
-  
-
-  if (attacker.punchCooldown > 0) {
-    attacker.punchCooldown--;
-  }
-}
-
-function drawPunch(player, color) {
-  if (!player.punching) return;
-
-  const punchWidth = 60;
-  const punchHeight = 30;
-  const punchX = player.facing === 1 ? player.x + player.width : player.x - punchWidth;
-  const punchY = player.y + player.height / 4;
-
-  ctx.fillStyle = color;
-  ctx.fillRect(punchX, punchY, punchWidth, punchHeight);
-}
-
-function shootProjectile(player, key) {
-  if (keys[key] && player.projectileCooldown <= 0) {
-    const dir = player.facing;
-    projectiles.push({
-      x: player.x + (dir === 1 ? player.width : -20),
-      y: player.y + player.height / 2 - 5,
-      width: 20,
-      height: 10,
-      dx: PROJECTILE_SPEED * dir,
-      owner: player
-    });
-    player.projectileCooldown = PROJECTILE_COOLDOWN;
-  }
-
-  if (player.projectileCooldown > 0) {
-    player.projectileCooldown--;
-  }
-}
-
-function updateProjectiles() {
-  for (let i = projectiles.length - 1; i >= 0; i--) {
-    const p = projectiles[i];
-    p.x += p.dx;
-
-    const target = p.owner === player1 ? player2 : player1;
-    if (
-      p.x < target.x + target.width &&
-      p.x + p.width > target.x &&
-      p.y < target.y + target.height &&
-      p.y + p.height > target.y
-    ) {
-      // Apply knockback using owner's multiplier
-      target.knockbackDx = Math.sign(p.dx) * (PROJECTILE_KNOCKBACK * target.knockbackMultiplier);
-    target.dy = -8;
-    target.knockbackMultiplier = Math.min(target.knockbackMultiplier + 0.2, 11);
-
+export class Game {
+  constructor() {
+    this.canvas = document.getElementById('gameCanvas');
+    this.ctx = this.canvas.getContext('2d');
+    this.gameOver = false;
     
-      projectiles.splice(i, 1);
-      continue;
-    }    
+    // Set canvas size
+    this.canvas.width = window.innerWidth;
+    this.canvas.height = window.innerHeight;
+    
+    // Create platform
+    this.platform = {
+      x: this.canvas.width / 4,
+      y: this.canvas.height / 2,
+      width: this.canvas.width / 2,
+      height: 100,
+    };
+    
+    // Initialize systems
+    this.inputHandler = new InputHandler();
+    this.combatSystem = new CombatSystem();
+    this.renderer = new Renderer(this.canvas, this.ctx);
+    this.uiManager = new UIManager();
+    
+    // Create players
+    this.player1 = new Player(
+      this.platform.x + this.platform.width / 7,
+      this.platform.y - 50
+    );
+    this.player2 = new Player(
+      this.platform.x + this.platform.width - 100,
+      this.platform.y - 50
+    );
+    
+    // Initialize UI
+    this.uiManager.updateStockDisplay(this.player1, 'player1');
+    this.uiManager.updateStockDisplay(this.player2, 'player2');
+    
+    // Setup restart button
+    this.uiManager.onRestartClick(() => this.restart());
+    
+    // Start game loop
+    this.gameLoop();
+  }
 
-    if (p.x < 0 || p.x > canvas.width) {
-      projectiles.splice(i, 1);
+  update() {
+    if (this.gameOver) return;
+
+    const p1Input = this.inputHandler.getPlayer1Input();
+    const p2Input = this.inputHandler.getPlayer2Input();
+    
+    // Handle jumping
+    if (p1Input.jump) this.player1.jump();
+    if (p2Input.jump) this.player2.jump();
+    
+    // Move players
+    this.player1.move(p1Input.left, p1Input.right, this.canvas);
+    this.player2.move(p2Input.left, p2Input.right, this.canvas);
+    
+    // Apply physics
+    this.player1.applyGravity(this.platform);
+    this.player2.applyGravity(this.platform);
+    
+    // Update animations
+    this.player1.updateAnimation();
+    this.player2.updateAnimation();
+    
+    // Apply friction
+    this.player1.dx *= 0.95;
+    this.player2.dx *= 0.95;
+    
+    // Check for falling off
+    if (this.player1.checkFallOff(this.canvas, this.platform.x + this.platform.width / 7)) {
+      this.uiManager.updateStockDisplay(this.player1, 'player1');
+    }
+    if (this.player2.checkFallOff(this.canvas, this.platform.x + this.platform.width - 100)) {
+      this.uiManager.updateStockDisplay(this.player2, 'player2');
+    }
+    
+    // Handle combat
+    this.combatSystem.handlePunching(this.player1, this.player2, p1Input.punch);
+    this.combatSystem.handlePunching(this.player2, this.player1, p2Input.punch);
+    
+    this.combatSystem.handleProjectile(this.player1, p1Input.projectile);
+    this.combatSystem.handleProjectile(this.player2, p2Input.projectile);
+    
+    this.combatSystem.updateProjectiles(this.player1, this.player2, this.canvas);
+    
+    // Check for game over
+    if (this.player1.stocks <= 0 || this.player2.stocks <= 0) {
+      this.gameOver = true;
+      this.uiManager.showRestartButton();
     }
   }
-}
 
-function drawProjectiles() {
-  ctx.fillStyle = 'gold';
-  projectiles.forEach(p => {
-    ctx.fillRect(p.x, p.y, p.width, p.height);
-  });
-}
-
-function resetPlayer(player, spawnX, spawnY) {
-  player.x = spawnX;
-  player.y = spawnY;
-  player.dx = 0;
-  player.dy = 0;
-  player.jumping = false;
-  player.grounded = true;
-  player.jumpsLeft = MAX_JUMPS;
-  player.stocks = 3;
-  player.knockbackMultiplier = 1;
-  updateStockDisplay(player);
-  resetKeyStates();
-}
-
-function resetKeyStates() {
-  for (const key in keys) {
-    keys[key] = false;
-  }
-}
-
-function updateGame() {
-  movePlayer(player1, 'a', 'd');
-  movePlayer(player2, '4', '6');
-
-  applyGravity(player1);
-  applyGravity(player2);
-
-  player1.dx *= 0.95;
-  player2.dx *= 0.95;
-
-  checkFallOff(player1, platform.x + platform.width/7);
-  checkFallOff(player2, platform.x + platform.width - 100);
-
-  handlePunching(player1, player2, 'q');
-  handlePunching(player2, player1, '7');
-
-  shootProjectile(player1, 'e');
-  shootProjectile(player2, '9');
-
-  updateProjectiles();
-
-  if (!gameOver && (player1.stocks <= 0 || player2.stocks <= 0)) {
-    gameOver = true;
-    restartBtn.style.display = 'block';
+  render() {
+    this.renderer.clearScreen();
+    this.renderer.drawPlatform(this.platform);
+    
+    this.renderer.drawPlayer(this.player1, GAME_CONFIG.PLAYER1_COLOR, this.platform);
+    this.renderer.drawPlayer(this.player2, GAME_CONFIG.PLAYER2_COLOR, this.platform);
+    
+    this.renderer.drawPunch(this.player1, GAME_CONFIG.PUNCH_COLOR_P1);
+    this.renderer.drawPunch(this.player2, GAME_CONFIG.PUNCH_COLOR_P2);
+    
+    this.renderer.drawProjectileCharging(this.player1);
+    this.renderer.drawProjectileCharging(this.player2);
+    
+    this.renderer.drawProjectiles(this.combatSystem.projectiles);
+    
+    // Update UI displays
+    this.uiManager.updatePercentDisplay(this.player1, 'player1');
+    this.uiManager.updatePercentDisplay(this.player2, 'player2');
+    
+    if (this.gameOver) {
+      const winner = this.player1.stocks <= 0 ? 'player2' : 'player1';
+      this.renderer.drawWinnerText(winner);
+    }
   }
 
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-  drawPlatform();
-  drawPlayer(player1, '#FF6347');
-  drawPlayer(player2, '#4682B4');
-  drawPunch(player1, '#FF0000');
-  drawPunch(player2, '#0000FF');
-  drawProjectiles();
-}
-
-restartBtn.addEventListener('click', () => {
-  gameOver = false;
-  restartBtn.style.display = 'none';
-  resetPlayer(player1, platform.x + platform.width/7, platform.y - player1.height);
-  resetPlayer(player2, platform.x + platform.width - 100, platform.y - player2.height);
-  requestAnimationFrame(gameLoop);
-});
-
-function drawWinnerText() {
-  ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-  ctx.fillStyle = player1.stocks <= 0 ? '#4682B4' : '#FF6347';
-  ctx.font = '60px Arial';
-  ctx.textAlign = 'center';
-  ctx.fillText(`${player1.stocks <= 0 ? 'Blue' : 'Red'} Wins!`, canvas.width / 2, canvas.height / 2 - 60);
-}
-
-function getDarkenedColor(baseColor, multiplier) {
-  const maxMultiplier = 10;
-  const factor = Math.min(multiplier / maxMultiplier, 1); // clamp between 0 and 1
-
-  const base = {
-    '#FF6347': [255, 99, 71],     // red
-    '#4682B4': [70, 130, 180],    // blue
-  };
-
-  const [r, g, b] = base[baseColor];
-  const darken = 1 - factor * 0.7; // reduce brightness by up to 70%
-
-  return `rgb(${r * darken}, ${g * darken}, ${b * darken})`;
-}
-
-function drawPlayer(player, baseColor) {
-  const color = getDarkenedColor(baseColor, player.knockbackMultiplier);
-  ctx.fillStyle = color;
-  ctx.fillRect(player.x, player.y, player.width, player.height);
-}
-
-
-function drawPlatform() {
-  ctx.fillStyle = '#8B4513';
-  ctx.fillRect(platform.x, platform.y, platform.width, platform.height);
-}
-
-function gameLoop() {
-  updateGame();
-updatePercentDisplay(player1);
-updatePercentDisplay(player2);
-  if (gameOver) {
-    drawWinnerText();
-    return;
+  gameLoop() {
+    this.update();
+    this.render();
+    
+    if (!this.gameOver) {
+      requestAnimationFrame(() => this.gameLoop());
+    }
   }
-  requestAnimationFrame(gameLoop);
-}
 
-gameLoop();
+  restart() {
+    this.gameOver = false;
+    this.uiManager.hideRestartButton();
+    
+    // Reset players
+    this.player1.reset(
+      this.platform.x + this.platform.width / 7,
+      this.platform.y - this.player1.height
+    );
+    this.player2.reset(
+      this.platform.x + this.platform.width - 100,
+      this.platform.y - this.player2.height
+    );
+    
+    // Reset systems
+    this.combatSystem.reset();
+    this.inputHandler.reset();
+    
+    // Update UI
+    this.uiManager.updateStockDisplay(this.player1, 'player1');
+    this.uiManager.updateStockDisplay(this.player2, 'player2');
+    
+    // Restart game loop
+    this.gameLoop();
+  }
+}
