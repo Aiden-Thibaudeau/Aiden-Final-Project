@@ -104,6 +104,60 @@ const keys = {
   l: false,
 };
 
+// Image loading
+let imagesLoaded = 0;
+const totalImages = 3;
+let allImagesLoaded = false;
+
+const backgroundImage = new Image();
+const playerImage = new Image();
+const platformImage = new Image();
+
+// Image loading function
+function loadImages() {
+    backgroundImage.onload = () => {
+        imagesLoaded++;
+        checkAllImagesLoaded();
+    };
+    
+    playerImage.onload = () => {
+        imagesLoaded++;
+        checkAllImagesLoaded();
+    };
+    
+    platformImage.onload = () => {
+        imagesLoaded++;
+        checkAllImagesLoaded();
+    };
+    
+    // Set image sources - replace these with your actual image paths
+    backgroundImage.src = 'background.jpg'; // Replace with your background image
+    playerImage.src = 'player.png';         // Replace with your player sprite
+    platformImage.src = 'platform.png';     // Replace with your platform image
+    
+    // Fallback for missing images
+    backgroundImage.onerror = () => {
+        imagesLoaded++;
+        checkAllImagesLoaded();
+    };
+    
+    playerImage.onerror = () => {
+        imagesLoaded++;
+        checkAllImagesLoaded();
+    };
+    
+    platformImage.onerror = () => {
+        imagesLoaded++;
+        checkAllImagesLoaded();
+    };
+}
+
+function checkAllImagesLoaded() {
+    if (imagesLoaded >= totalImages) {
+        allImagesLoaded = true;
+    }
+}
+
 // New: Character selection logic
 const colors = ['#FF6347', '#4682B4', '#32CD32', '#FFD700', '#8A2BE2'];
 
@@ -590,44 +644,45 @@ function resetKeyStates() {
 }
 
 function updateGame() {
-  movePlayer(player1, 'a', 'd');
-  movePlayer(player2, 'ArrowLeft', 'ArrowRight');
+   movePlayer(player1, 'a', 'd');
+    movePlayer(player2, 'ArrowLeft', 'ArrowRight');
 
-  applyGravity(player1);
-  applyGravity(player2);
-  
-  // Update animations
-  updatePlayerAnimation(player1);
-  updatePlayerAnimation(player2);
+    applyGravity(player1);
+    applyGravity(player2);
+    
+    // Update animations
+    updatePlayerAnimation(player1);
+    updatePlayerAnimation(player2);
 
-  player1.dx *= 0.95;
-  player2.dx *= 0.95;
+    player1.dx *= 0.95;
+    player2.dx *= 0.95;
 
-  checkFallOff(player1, platform.x + platform.width/7);
-  checkFallOff(player2, platform.x + platform.width - 100);
+    checkFallOff(player1, platform.x + platform.width/7);
+    checkFallOff(player2, platform.x + platform.width - 100);
 
-  handlePunching(player1, player2, 'r');
-  handlePunching(player2, player1, 'k');
+    handlePunching(player1, player2, 'r');
+    handlePunching(player2, player1, 'k');
 
-  shootProjectile(player1, 't');
-  shootProjectile(player2, 'l');
+    shootProjectile(player1, 't');
+    shootProjectile(player2, 'l');
 
-  updateProjectiles();
+    updateProjectiles();
 
-  if (!gameOver && (player1.stocks <= 0 || player2.stocks <= 0)) {
-    gameOver = true;
-    restartBtn.style.display = 'block';
-  }
+    if (!gameOver && (player1.stocks <= 0 || player2.stocks <= 0)) {
+        gameOver = true;
+        restartBtn.style.display = 'block';
+    }
 
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-drawPlatform();
-drawPlayer(player1); // Removed color argument
-drawPlayer(player2); // Removed color argument
-drawPunch(player1, '#FF0000'); // You can make these dynamic too if you want, but for now they are fine.
-drawPunch(player2, '#0000FF'); // Same here
-drawProjectileCharging(player1);
-drawProjectileCharging(player2);
-drawProjectiles();
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    drawBackground(); // NEW: Draw background first
+    drawPlatform();
+    drawPlayer(player1);
+    drawPlayer(player2);
+    drawPunch(player1, '#FF0000');
+    drawPunch(player2, '#0000FF');
+    drawProjectileCharging(player1);
+    drawProjectileCharging(player2);
+    drawProjectiles();
 }
 
 restartBtn.addEventListener('click', () => {
@@ -667,49 +722,99 @@ function getDarkenedColor(baseColor, multiplier) {
     return `rgb(${Math.round(r * darken)}, ${Math.round(g * darken)}, ${Math.round(b * darken)})`;
 }
 
-function drawPlayer(player) { // Removed baseColor parameter
-    const color = getDarkenedColor(player.color, player.knockbackMultiplier); // Use player.color
-    ctx.fillStyle = color;
-  
-  // Calculate animated dimensions and position
-  const animatedWidth = player.width * (player.grounded ? player.squishFactor : 1/player.stretchFactor);
-  const animatedHeight = player.height * (player.grounded ? 1/player.squishFactor : player.stretchFactor);
-  
-  // Adjust position to keep player centered during animation
-  const animatedX = player.x + (player.width - animatedWidth) / 2;
-  const animatedY = player.y + (player.height - animatedHeight) + (player.floatOffset || 0);
-  
-  // Add subtle rotation when in air for more dynamic feel
-  if (!player.grounded && Math.abs(player.dx) > 2) {
-    ctx.save();
-    ctx.translate(animatedX + animatedWidth/2, animatedY + animatedHeight/2);
-    ctx.rotate(player.dx * 0.02); // Slight rotation based on horizontal movement
-    ctx.fillRect(-animatedWidth/2, -animatedHeight/2, animatedWidth, animatedHeight);
-    ctx.restore();
-  } else {
-    ctx.fillRect(animatedX, animatedY, animatedWidth, animatedHeight);
-  }
-  
-  // Draw a subtle shadow when jumping
-  if (!player.grounded) {
-    const shadowY = platform.y + 5;
-    const shadowAlpha = Math.max(0.1, 0.3 - (player.y - platform.y) / 200);
-    const shadowWidth = animatedWidth * (0.8 - (player.y - platform.y) / 400);
+function drawPlayer(player) {
+    // Calculate animated dimensions and position
+    const animatedWidth = player.width * (player.grounded ? player.squishFactor : 1/player.stretchFactor);
+    const animatedHeight = player.height * (player.grounded ? 1/player.squishFactor : player.stretchFactor);
     
-    ctx.fillStyle = `rgba(0, 0, 0, ${shadowAlpha})`;
-    ctx.fillRect(
-      player.x + (player.width - shadowWidth) / 2, 
-      shadowY, 
-      shadowWidth, 
-      8
-    );
-  }
+    // Adjust position to keep player centered during animation
+    const animatedX = player.x + (player.width - animatedWidth) / 2;
+    const animatedY = player.y + (player.height - animatedHeight) + (player.floatOffset || 0);
+    
+    // Add subtle rotation when in air for more dynamic feel
+    if (!player.grounded && Math.abs(player.dx) > 2) {
+        ctx.save();
+        ctx.translate(animatedX + animatedWidth/2, animatedY + animatedHeight/2);
+        ctx.rotate(player.dx * 0.02); // Slight rotation based on horizontal movement
+        
+        if (playerImage.complete && playerImage.naturalWidth > 0) {
+            // Apply color tint to image
+            ctx.globalCompositeOperation = 'multiply';
+            ctx.fillStyle = getDarkenedColor(player.color, player.knockbackMultiplier);
+            ctx.fillRect(-animatedWidth/2, -animatedHeight/2, animatedWidth, animatedHeight);
+            
+            ctx.globalCompositeOperation = 'destination-atop';
+            ctx.drawImage(playerImage, -animatedWidth/2, -animatedHeight/2, animatedWidth, animatedHeight);
+            
+            ctx.globalCompositeOperation = 'source-over';
+        } else {
+            // Fallback to colored rectangle
+            const color = getDarkenedColor(player.color, player.knockbackMultiplier);
+            ctx.fillStyle = color;
+            ctx.fillRect(-animatedWidth/2, -animatedHeight/2, animatedWidth, animatedHeight);
+        }
+        ctx.restore();
+    } else {
+        if (playerImage.complete && playerImage.naturalWidth > 0) {
+            // Apply color tint to image
+            ctx.save();
+            ctx.globalCompositeOperation = 'multiply';
+            ctx.fillStyle = getDarkenedColor(player.color, player.knockbackMultiplier);
+            ctx.fillRect(animatedX, animatedY, animatedWidth, animatedHeight);
+            
+            ctx.globalCompositeOperation = 'destination-atop';
+            ctx.drawImage(playerImage, animatedX, animatedY, animatedWidth, animatedHeight);
+            ctx.restore();
+        } else {
+            // Fallback to colored rectangle
+            const color = getDarkenedColor(player.color, player.knockbackMultiplier);
+            ctx.fillStyle = color;
+            ctx.fillRect(animatedX, animatedY, animatedWidth, animatedHeight);
+        }
+    }
+    
+    // Draw a subtle shadow when jumping
+    if (!player.grounded) {
+        const shadowY = platform.y + 5;
+        const shadowAlpha = Math.max(0.1, 0.3 - (player.y - platform.y) / 200);
+        const shadowWidth = animatedWidth * (0.8 - (player.y - platform.y) / 400);
+        
+        ctx.fillStyle = `rgba(0, 0, 0, ${shadowAlpha})`;
+        ctx.fillRect(
+            player.x + (player.width - shadowWidth) / 2, 
+            shadowY, 
+            shadowWidth, 
+            8
+        );
+    }
 }
 
+
 function drawPlatform() {
-  ctx.fillStyle = '#8B4513';
-  ctx.fillRect(platform.x, platform.y, platform.width, platform.height);
+    if (platformImage.complete && platformImage.naturalWidth > 0) {
+        // Draw platform image, stretching to fit platform dimensions
+        ctx.drawImage(platformImage, platform.x, platform.y, platform.width, platform.height);
+    } else {
+        // Fallback to colored rectangle
+        ctx.fillStyle = '#8B4513';
+        ctx.fillRect(platform.x, platform.y, platform.width, platform.height);
+    }
 }
+
+function drawBackground() {
+    if (backgroundImage.complete && backgroundImage.naturalWidth > 0) {
+        // Draw background image, scaling to fit canvas
+        ctx.drawImage(backgroundImage, 0, 0, canvas.width, canvas.height);
+    } else {
+        // Fallback to gradient background
+        const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+        gradient.addColorStop(0, '#87CEEB'); // Sky blue
+        gradient.addColorStop(1, '#98FB98'); // Pale green
+        ctx.fillStyle = gradient;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+    }
+}
+
 
 function gameLoop() {
     if (!gameStarted) {
@@ -730,3 +835,5 @@ function gameLoop() {
 // New: Initial setup: display character select screen and hide game UI
 characterSelectScreen.style.display = 'flex';
 gameUI.style.display = 'none'; // Hide game UI until game starts
+
+loadImages();
