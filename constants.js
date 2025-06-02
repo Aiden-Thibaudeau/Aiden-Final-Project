@@ -1,44 +1,15 @@
-// Game constants and configuration
-export const GAME_CONFIG = {
-  GRAVITY: 1.5,
-  JUMP_STRENGTH: 20,
-  PLAYER_SPEED: 8,
-  MAX_JUMPS: 2,
-  PUNCH_DURATION: 10,
-  PUNCH_COOLDOWN: 20,
-  KNOCKBACK_FORCE: 15,
-  PROJECTILE_SPEED: 12,
-  PROJECTILE_COOLDOWN: 20,
-  PROJECTILE_KNOCKBACK: 10,
-  
-  // Charging constants
-  MAX_CHARGE_TIME: 90, // 1.5 seconds at 60fps
-  MIN_CHARGE_MULTIPLIER: 1.0,
-  MAX_CHARGE_MULTIPLIER: 2.5,
-  
-  // Player colors
-  PLAYER1_COLOR: '#FF6347',
-  PLAYER2_COLOR: '#4682B4',
-  PUNCH_COLOR_P1: '#FF0000',
-  PUNCH_COLOR_P2: '#0000FF',
-  
-  // Platform color
-  PLATFORM_COLOR: '#8B4513'
-};
+export const GRAVITY = 1.5;
+export const JUMP_STRENGTH = 20;
+export const PLAYER_SPEED = 8;
+export const MAX_JUMPS = 2;
+export const PUNCH_DURATION = 10;
+export const PUNCH_COOLDOWN = 20;
+export const KNOCKBACK_FORCE = 15;
+export const PROJECTILE_SPEED = 12;
+export const PROJECTILE_COOLDOWN = 20;
+export const PROJECTILE_KNOCKBACK = 10;
+export const MAX_CHARGE_TIME = 90;
+export const MIN_CHARGE_MULTIPLIER = 1.0;
+export const MAX_CHARGE_MULTIPLIER = 2.5;
 
-export const CONTROLS = {
-  PLAYER1: {
-    LEFT: 'a',
-    RIGHT: 'd',
-    JUMP: 'w',
-    PUNCH: 'q',
-    PROJECTILE: 'e'
-  },
-  PLAYER2: {
-    LEFT: '4',
-    RIGHT: '6',
-    JUMP: '8',
-    PUNCH: '7',
-    PROJECTILE: '9'
-  }
-};
+export const COLORS = ['#FF6347', '#4682B4', '#32CD32', '#FFD700', '#8A2BE2'];

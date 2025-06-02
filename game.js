@@ -92,16 +92,16 @@ updateStockDisplay(player1);
 updateStockDisplay(player2);
 
 const keys = {
-  '4': false,
-  '6': false,
-  '8': false,
+  'ArrowLeft': false,
+  'ArrowRight': false,
+  'ArrowUp': false,
   a: false,
   d: false,
   w: false,
-  q: false,
-  '7': false,
-  e: false,
-  '9': false,
+  r: false,
+  k: false,
+  t: false,
+  l: false,
 };
 
 // New: Character selection logic
@@ -166,7 +166,7 @@ window.addEventListener('keydown', (e) => {
     // Add jump stretch effect
     player1.stretchFactor = 1.3;
   }
-  if (e.key === '8' && player2.jumpsLeft > 0) {
+  if (e.key === 'ArrowUp' && player2.jumpsLeft > 0) {
     player2.dy = -JUMP_STRENGTH;
     player2.jumping = true;
     player2.grounded = false;
@@ -591,7 +591,7 @@ function resetKeyStates() {
 
 function updateGame() {
   movePlayer(player1, 'a', 'd');
-  movePlayer(player2, '4', '6');
+  movePlayer(player2, 'ArrowLeft', 'ArrowRight');
 
   applyGravity(player1);
   applyGravity(player2);
@@ -606,11 +606,11 @@ function updateGame() {
   checkFallOff(player1, platform.x + platform.width/7);
   checkFallOff(player2, platform.x + platform.width - 100);
 
-  handlePunching(player1, player2, 'q');
-  handlePunching(player2, player1, '7');
+  handlePunching(player1, player2, 'r');
+  handlePunching(player2, player1, 'k');
 
-  shootProjectile(player1, 'e');
-  shootProjectile(player2, '9');
+  shootProjectile(player1, 't');
+  shootProjectile(player2, 'l');
 
   updateProjectiles();
 

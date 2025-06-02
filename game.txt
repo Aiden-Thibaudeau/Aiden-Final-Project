@@ -1,162 +1,224 @@
-import { GAME_CONFIG } from './constants.js';
-import { Player } from './player.js';
-import { CombatSystem } from './combat.js';
-import { Renderer } from './renderer.js';
-import { InputHandler } from './input.js';
-import { UIManager } from './ui.js';
+import { GRAVITY, MAX_JUMPS, COLORS } from './constants.js';
+import { createPlayer, updatePlayerAnimation, resetPlayer } from './player.js';
+import { setupInputListeners, movePlayer, resetKeyStates } from './input.js';
+import { handlePunching, shootProjectile, updateProjectiles, projectiles } from './combat.js';
+import { drawPlayer, drawPlatform, drawPunch, drawProjectileCharging, drawProjectiles, drawWinnerText } from './renderer.js';
 
-export class Game {
-  constructor() {
-    this.canvas = document.getElementById('gameCanvas');
-    this.ctx = this.canvas.getContext('2d');
-    this.gameOver = false;
+let gameOver = false;
+let gameStarted = false;
+
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+
+const characterSelectScreen = document.getElementById('characterSelectScreen');
+const player1ColorOptions = document.getElementById('player1ColorOptions');
+const player2ColorOptions = document.getElementById('player2ColorOptions');
+const player1Preview = document.getElementById('player1Preview');
+const player2Preview = document.getElementById('player2Preview');
+const startGameBtn = document.getElementById('startGameBtn');
+const restartBtn = document.getElementById('restartBtn');
+const gameUI = document.getElementById('gameUI');
+
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
+
+const platform = {
+  x: canvas.width / 4,
+  y: canvas.height / 2,
+  width: canvas.width / 2,
+  height: 100,
+};
+
+const player1 = createPlayer(platform.x + platform.width/7, platform);
+const player2 = createPlayer(platform.x + platform.width - 100, platform);
+
+let player1SelectedColor = '#FF6347';
+let player2SelectedColor = '#4682B4';
+
+setupInputListeners(player1, player2);
+
+function applyGravity(player) {
+  const wasGrounded = player.grounded;
+  player.dy += GRAVITY;
+  const nextY = player.y + player.dy;
+
+  const onPlatform = (
+    player.dy > 0 &&
+    player.y + player.height <= platform.y &&
+    nextY + player.height >= platform.y &&
+    player.x + player.width > platform.x &&
+    player.x < platform.x + platform.width
+  );
+
+  if (onPlatform) {
+    player.dy = 0;
+    player.y = platform.y - player.height;
+    player.grounded = true;
+    player.jumping = false;
+    player.jumpsLeft = MAX_JUMPS;
     
-    // Set canvas size
-    this.canvas.width = window.innerWidth;
-    this.canvas.height = window.innerHeight;
-    
-    // Create platform
-    this.platform = {
-      x: this.canvas.width / 4,
-      y: this.canvas.height / 2,
-      width: this.canvas.width / 2,
-      height: 100,
-    };
-    
-    // Initialize systems
-    this.inputHandler = new InputHandler();
-    this.combatSystem = new CombatSystem();
-    this.renderer = new Renderer(this.canvas, this.ctx);
-    this.uiManager = new UIManager();
-    
-    // Create players
-    this.player1 = new Player(
-      this.platform.x + this.platform.width / 7,
-      this.platform.y - 50
-    );
-    this.player2 = new Player(
-      this.platform.x + this.platform.width - 100,
-      this.platform.y - 50
-    );
-    
-    // Initialize UI
-    this.uiManager.updateStockDisplay(this.player1, 'player1');
-    this.uiManager.updateStockDisplay(this.player2, 'player2');
-    
-    // Setup restart button
-    this.uiManager.onRestartClick(() => this.restart());
-    
-    // Start game loop
-    this.gameLoop();
+    if (!wasGrounded && player.dy > 8) {
+      player.squishFactor = 0.7;
+    } else if (!wasGrounded) {
+      player.squishFactor = 0.85;
+    }
+  } else {
+    player.grounded = false;
   }
 
-  update() {
-    if (this.gameOver) return;
+  player.y += player.dy;
+}
 
-    const p1Input = this.inputHandler.getPlayer1Input();
-    const p2Input = this.inputHandler.getPlayer2Input();
-    
-    // Handle jumping
-    if (p1Input.jump) this.player1.jump();
-    if (p2Input.jump) this.player2.jump();
-    
-    // Move players
-    this.player1.move(p1Input.left, p1Input.right, this.canvas);
-    this.player2.move(p2Input.left, p2Input.right, this.canvas);
-    
-    // Apply physics
-    this.player1.applyGravity(this.platform);
-    this.player2.applyGravity(this.platform);
-    
-    // Update animations
-    this.player1.updateAnimation();
-    this.player2.updateAnimation();
-    
-    // Apply friction
-    this.player1.dx *= 0.95;
-    this.player2.dx *= 0.95;
-    
-    // Check for falling off
-    if (this.player1.checkFallOff(this.canvas, this.platform.x + this.platform.width / 7)) {
-      this.uiManager.updateStockDisplay(this.player1, 'player1');
-    }
-    if (this.player2.checkFallOff(this.canvas, this.platform.x + this.platform.width - 100)) {
-      this.uiManager.updateStockDisplay(this.player2, 'player2');
-    }
-    
-    // Handle combat
-    this.combatSystem.handlePunching(this.player1, this.player2, p1Input.punch);
-    this.combatSystem.handlePunching(this.player2, this.player1, p2Input.punch);
-    
-    this.combatSystem.handleProjectile(this.player1, p1Input.projectile);
-    this.combatSystem.handleProjectile(this.player2, p2Input.projectile);
-    
-    this.combatSystem.updateProjectiles(this.player1, this.player2, this.canvas);
-    
-    // Check for game over
-    if (this.player1.stocks <= 0 || this.player2.stocks <= 0) {
-      this.gameOver = true;
-      this.uiManager.showRestartButton();
-    }
-  }
+function updateStockDisplay(player) {
+  const containerId = player === player1 ? 'player1Stock' : 'player2Stock';
+  const stockContainer = document.getElementById(containerId);
 
-  render() {
-    this.renderer.clearScreen();
-    this.renderer.drawPlatform(this.platform);
-    
-    this.renderer.drawPlayer(this.player1, GAME_CONFIG.PLAYER1_COLOR, this.platform);
-    this.renderer.drawPlayer(this.player2, GAME_CONFIG.PLAYER2_COLOR, this.platform);
-    
-    this.renderer.drawPunch(this.player1, GAME_CONFIG.PUNCH_COLOR_P1);
-    this.renderer.drawPunch(this.player2, GAME_CONFIG.PUNCH_COLOR_P2);
-    
-    this.renderer.drawProjectileCharging(this.player1);
-    this.renderer.drawProjectileCharging(this.player2);
-    
-    this.renderer.drawProjectiles(this.combatSystem.projectiles);
-    
-    // Update UI displays
-    this.uiManager.updatePercentDisplay(this.player1, 'player1');
-    this.uiManager.updatePercentDisplay(this.player2, 'player2');
-    
-    if (this.gameOver) {
-      const winner = this.player1.stocks <= 0 ? 'player2' : 'player1';
-      this.renderer.drawWinnerText(winner);
-    }
-  }
-
-  gameLoop() {
-    this.update();
-    this.render();
-    
-    if (!this.gameOver) {
-      requestAnimationFrame(() => this.gameLoop());
-    }
-  }
-
-  restart() {
-    this.gameOver = false;
-    this.uiManager.hideRestartButton();
-    
-    // Reset players
-    this.player1.reset(
-      this.platform.x + this.platform.width / 7,
-      this.platform.y - this.player1.height
-    );
-    this.player2.reset(
-      this.platform.x + this.platform.width - 100,
-      this.platform.y - this.player2.height
-    );
-    
-    // Reset systems
-    this.combatSystem.reset();
-    this.inputHandler.reset();
-    
-    // Update UI
-    this.uiManager.updateStockDisplay(this.player1, 'player1');
-    this.uiManager.updateStockDisplay(this.player2, 'player2');
-    
-    // Restart game loop
-    this.gameLoop();
+  stockContainer.innerHTML = '';
+  for (let i = 0; i < player.stocks; i++) {
+    const heart = document.createElement('img');
+    heart.src = 'hearts.png';
+    heart.alt = 'Heart';
+    stockContainer.appendChild(heart);
   }
 }
+
+function updatePercentDisplay(player) {
+  const percentId = player === player1 ? 'player1Percent' : 'player2Percent';
+  const percentContainer = document.getElementById(percentId);
+  percentContainer.textContent = `${Math.round((player.knockbackMultiplier - 1) * 10)}%`;
+}
+
+function checkFallOff(player, spawnX) {
+  if (player.y > canvas.height) {
+    if (player.stocks > 1) {
+      player.stocks--;
+      updateStockDisplay(player);
+      player.x = spawnX;
+      player.y = platform.y - player.height;
+      player.dy = 0;
+      player.jumping = false;
+      player.grounded = true;
+      player.jumpsLeft = MAX_JUMPS;
+      player.knockbackMultiplier = 1;
+      player.squishFactor = 1;
+      player.stretchFactor = 1;
+      player.floatOffset = 0;
+    } else {
+      player.stocks = 0;
+      updateStockDisplay(player);
+    }
+  }
+}
+
+function setupColorSelection(playerColorOptions, playerPreview, playerNumber) {
+  playerColorOptions.querySelectorAll('.color-box').forEach(box => {
+    const color = box.dataset.color;
+    box.style.backgroundColor = color;
+
+    if ((playerNumber === 1 && color === player1SelectedColor) || (playerNumber === 2 && color === player2SelectedColor)) {
+      box.classList.add('selected');
+    }
+
+    box.addEventListener('click', () => {
+      playerColorOptions.querySelectorAll('.color-box').forEach(b => b.classList.remove('selected'));
+      box.classList.add('selected');
+
+      if (playerNumber === 1) {
+        player1SelectedColor = color;
+        player1Preview.style.backgroundColor = color;
+      } else {
+        player2SelectedColor = color;
+        player2Preview.style.backgroundColor = color;
+      }
+    });
+  });
+}
+
+setupColorSelection(player1ColorOptions, player1Preview, 1);
+setupColorSelection(player2ColorOptions, player2Preview, 2);
+
+startGameBtn.addEventListener('click', () => {
+  characterSelectScreen.style.display = 'none';
+  gameUI.style.display = 'block';
+  gameStarted = true;
+  player1.color = player1SelectedColor;
+  player2.color = player2SelectedColor;
+
+  resetPlayer(player1, platform.x + platform.width / 7, platform.y - player1.height);
+  resetPlayer(player2, platform.x + platform.width - 100, platform.y - player2.height);
+  
+  updateStockDisplay(player1);
+  updateStockDisplay(player2);
+
+  gameLoop();
+});
+
+function updateGame() {
+  movePlayer(player1, 'a', 'd', canvas);
+  movePlayer(player2, 'ArrowLeft', 'ArrowRight', canvas);
+
+  applyGravity(player1);
+  applyGravity(player2);
+  
+  updatePlayerAnimation(player1);
+  updatePlayerAnimation(player2);
+
+  player1.dx *= 0.95;
+  player2.dx *= 0.95;
+
+  checkFallOff(player1, platform.x + platform.width/7);
+  checkFallOff(player2, platform.x + platform.width - 100);
+
+  handlePunching(player1, player2, 'r');
+  handlePunching(player2, player1, 'k');
+
+  shootProjectile(player1, 't');
+  shootProjectile(player2, 'l');
+
+  updateProjectiles(player1, player2);
+
+  if (!gameOver && (player1.stocks <= 0 || player2.stocks <= 0)) {
+    gameOver = true;
+    restartBtn.style.display = 'block';
+  }
+
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  drawPlatform(ctx, platform);
+  drawPlayer(ctx, player1, platform);
+  drawPlayer(ctx, player2, platform);
+  drawPunch(ctx, player1, '#FF0000');
+  drawPunch(ctx, player2, '#0000FF');
+  drawProjectileCharging(ctx, player1);
+  drawProjectileCharging(ctx, player2);
+  drawProjectiles(ctx, projectiles);
+}
+
+restartBtn.addEventListener('click', () => {
+  gameOver = false
+    restartBtn.style.display = 'none';
+  resetPlayer(player1, platform.x + platform.width/7, platform.y - player1.height);
+  resetPlayer(player2, platform.x + platform.width - 100, platform.y - player2.height);
+  projectiles.length = 0; // Clear all projectiles
+  requestAnimationFrame(gameLoop);
+});
+
+function gameLoop() {
+  if (!gameStarted) {
+    return;
+  }
+
+  updateGame();
+  updatePercentDisplay(player1);
+  updatePercentDisplay(player2);
+  
+  if (gameOver) {
+    drawWinnerText(ctx, canvas, player1);
+    return;
+  }
+  
+  requestAnimationFrame(gameLoop);
+}
+
+// Initial setup: display character select screen and hide game UI
+characterSelectScreen.style.display = 'flex';
+gameUI.style.display = 'none';
