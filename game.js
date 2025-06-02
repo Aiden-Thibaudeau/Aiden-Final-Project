@@ -395,13 +395,14 @@ function handlePunching(attacker, defender, punchKey) {
     } else {
       const punchWidth = 60;
       const punchHeight = 30;
-      const punchX = attacker.facing === 1 ? attacker.x + attacker.width : attacker.x - punchWidth;
-      const punchY = attacker.y + attacker.height / 4;
+      // Fixed punch collision box positioning (uses actual player size, not doubled)
+      const punchX = attacker.facing === 1 ? attacker.x + attacker.width * 2 : attacker.x - punchWidth;
+      const punchY = attacker.y + (attacker.height * 2) / 4;
   
       if (
-        punchX < defender.x + defender.width &&
+        punchX < defender.x + defender.width * 2 &&
         punchX + punchWidth > defender.x &&
-        punchY < defender.y + defender.height &&
+        punchY < defender.y + defender.height * 2 &&
         punchY + punchHeight > defender.y
       ) {
         const knockDirection = attacker.facing;
@@ -429,8 +430,9 @@ function drawPunch(player, color) {
 
   const punchWidth = 60;
   const punchHeight = 30;
-  const punchX = player.facing === 1 ? player.x + player.width : player.x - punchWidth;
-  const punchY = player.y + player.height / 4;
+  // Fixed visual punch positioning to match doubled player size
+  const punchX = player.facing === 1 ? player.x + player.width * 2 + 10 : player.x - punchWidth - 10;
+  const punchY = player.y + (player.height * 2) / 3;
 
   if (player.punching) {
     // Draw punch with intensity based on charge
@@ -451,11 +453,11 @@ function drawPunch(player, color) {
     ctx.globalAlpha = chargeAlpha * pulse;
     ctx.fillRect(punchX, punchY, punchWidth, punchHeight);
     
-    // Draw charge bar above player
+    // Draw charge bar above player - positioned correctly for doubled size
     const barWidth = 60;
     const barHeight = 8;
-    const barX = player.x + (player.width - barWidth) / 2;
-    const barY = player.y - 20;
+    const barX = player.x + (player.width * 2 - barWidth) / 2; // Center above player
+    const barY = player.y - 15;
     
     // Background bar
     ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
@@ -468,6 +470,7 @@ function drawPunch(player, color) {
     ctx.globalAlpha = 1;
   }
 }
+
 
 function shootProjectile(player, key) {
   // Handle projectile charging
@@ -552,11 +555,11 @@ function drawProjectileCharging(player) {
   
   const chargeProgress = player.projectileChargeTime / MAX_CHARGE_TIME;
   
-  // Draw projectile charging indicator
+  // Draw projectile charging indicator - positioned for doubled player size
   const dir = player.facing;
   const chargedSize = Math.round(20 + (player.projectileChargeMultiplier - 1) * 15);
-  const projectileX = player.x + (dir === 1 ? player.width + 10 : -chargedSize - 10);
-  const projectileY = player.y + player.height / 2 - chargedSize/2;
+  const projectileX = player.x + (dir === 1 ? player.width * 2 + 10 : -chargedSize - 10);
+  const projectileY = player.y + player.height * 2 / 2 - chargedSize/2;
   
   // Pulsing effect
   const pulse = Math.sin(player.projectileChargeTime * 0.4) * 0.3 + 0.7;
@@ -583,6 +586,7 @@ function drawProjectileCharging(player) {
   
   ctx.globalAlpha = 1;
 }
+
 
 function drawProjectiles() {
   projectiles.forEach(p => {
@@ -723,70 +727,52 @@ function getDarkenedColor(baseColor, multiplier) {
 }
 
 function drawPlayer(player) {
-    // Calculate animated dimensions and position
-    const animatedWidth = player.width * (player.grounded ? player.squishFactor : 1/player.stretchFactor);
-    const animatedHeight = player.height * (player.grounded ? 1/player.squishFactor : player.stretchFactor);
+    // Calculate animated dimensions and position (doubled in size)
+    const animatedWidth = player.width * 2 * (player.grounded ? player.squishFactor : 1/player.stretchFactor);
+    const animatedHeight = player.height * 2 * (player.grounded ? 1/player.squishFactor : player.stretchFactor);
     
     // Adjust position to keep player centered during animation
-    const animatedX = player.x + (player.width - animatedWidth) / 2;
-    const animatedY = player.y + (player.height - animatedHeight) + (player.floatOffset || 0);
+    const animatedX = player.x + (player.width * 2 - animatedWidth) / 2;
+    const animatedY = player.y + (player.height * 2 - animatedHeight) + (player.floatOffset || 0);
+    
+    ctx.save();
+    
+    // Mirror image based on facing direction
+    if (player.facing === -1) {
+        ctx.scale(-1, 1);
+    }
     
     // Add subtle rotation when in air for more dynamic feel
     if (!player.grounded && Math.abs(player.dx) > 2) {
-        ctx.save();
-        ctx.translate(animatedX + animatedWidth/2, animatedY + animatedHeight/2);
+        const centerX = player.facing === -1 ? -(animatedX + animatedWidth/2) : animatedX + animatedWidth/2;
+        const centerY = animatedY + animatedHeight/2;
+        
+        ctx.translate(centerX, centerY);
         ctx.rotate(player.dx * 0.02); // Slight rotation based on horizontal movement
         
         if (playerImage.complete && playerImage.naturalWidth > 0) {
-            // Apply color tint to image
-            ctx.globalCompositeOperation = 'multiply';
-            ctx.fillStyle = getDarkenedColor(player.color, player.knockbackMultiplier);
-            ctx.fillRect(-animatedWidth/2, -animatedHeight/2, animatedWidth, animatedHeight);
-            
-            ctx.globalCompositeOperation = 'destination-atop';
+            // Draw the image to fill the entire character hitbox
             ctx.drawImage(playerImage, -animatedWidth/2, -animatedHeight/2, animatedWidth, animatedHeight);
-            
-            ctx.globalCompositeOperation = 'source-over';
         } else {
-            // Fallback to colored rectangle
-            const color = getDarkenedColor(player.color, player.knockbackMultiplier);
-            ctx.fillStyle = color;
+            // Fallback to colored rectangle (keeping original player color)
+            ctx.fillStyle = player.color;
             ctx.fillRect(-animatedWidth/2, -animatedHeight/2, animatedWidth, animatedHeight);
         }
-        ctx.restore();
     } else {
+        const drawX = player.facing === -1 ? -(animatedX + animatedWidth) : animatedX;
+        const drawY = animatedY;
+        
         if (playerImage.complete && playerImage.naturalWidth > 0) {
-            // Apply color tint to image
-            ctx.save();
-            ctx.globalCompositeOperation = 'multiply';
-            ctx.fillStyle = getDarkenedColor(player.color, player.knockbackMultiplier);
-            ctx.fillRect(animatedX, animatedY, animatedWidth, animatedHeight);
-            
-            ctx.globalCompositeOperation = 'destination-atop';
-            ctx.drawImage(playerImage, animatedX, animatedY, animatedWidth, animatedHeight);
-            ctx.restore();
+            // Draw the image to fill the entire character hitbox
+            ctx.drawImage(playerImage, drawX, drawY, animatedWidth, animatedHeight);
         } else {
-            // Fallback to colored rectangle
-            const color = getDarkenedColor(player.color, player.knockbackMultiplier);
-            ctx.fillStyle = color;
-            ctx.fillRect(animatedX, animatedY, animatedWidth, animatedHeight);
+            // Fallback to colored rectangle (keeping original player color)
+            ctx.fillStyle = player.color;
+            ctx.fillRect(drawX, drawY, animatedWidth, animatedHeight);
         }
     }
     
-    // Draw a subtle shadow when jumping
-    if (!player.grounded) {
-        const shadowY = platform.y + 5;
-        const shadowAlpha = Math.max(0.1, 0.3 - (player.y - platform.y) / 200);
-        const shadowWidth = animatedWidth * (0.8 - (player.y - platform.y) / 400);
-        
-        ctx.fillStyle = `rgba(0, 0, 0, ${shadowAlpha})`;
-        ctx.fillRect(
-            player.x + (player.width - shadowWidth) / 2, 
-            shadowY, 
-            shadowWidth, 
-            8
-        );
-    }
+    ctx.restore();
 }
 
 
