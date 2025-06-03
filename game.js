@@ -31,6 +31,9 @@ const MAX_CHARGE_TIME = 90; // 1.5 seconds at 60fps
 const MIN_CHARGE_MULTIPLIER = 1.0;
 const MAX_CHARGE_MULTIPLIER = 2.5;
 
+// Define how far off-screen a player can go before losing a stock
+const HORIZONTAL_BOUNDARY_OFFSET = 150; // Pixels off screen before losing a stock
+
 canvas.width = window.innerWidth;
 canvas.height = window.innerHeight;
 
@@ -84,10 +87,6 @@ const player2 = createPlayer(platform.x + platform.width -100);
 let player1SelectedColor = '#FF6347'; // Default color for Player 1
 let player2SelectedColor = '#4682B4'; // Default color for Player 2
 
-// Initial stock and percent displays are handled after game starts
-// updateStockDisplay(player1); // Remove this
-// updateStockDisplay(player2); // Remove this
-
 updateStockDisplay(player1);
 updateStockDisplay(player2);
 
@@ -106,11 +105,12 @@ const keys = {
 
 // Image loading
 let imagesLoaded = 0;
-const totalImages = 3;
+const totalImages = 4; // background, platform, player1, player2
 let allImagesLoaded = false;
 
 const backgroundImage = new Image();
-const playerImage = new Image();
+const player1Image = new Image();
+const player2Image = new Image();
 const platformImage = new Image();
 
 // Image loading function
@@ -119,37 +119,43 @@ function loadImages() {
         imagesLoaded++;
         checkAllImagesLoaded();
     };
-    
-    playerImage.onload = () => {
+    backgroundImage.onerror = () => { // Added onerror for consistency
         imagesLoaded++;
         checkAllImagesLoaded();
     };
-    
+
     platformImage.onload = () => {
         imagesLoaded++;
         checkAllImagesLoaded();
     };
-    
-    // Set image sources - replace these with your actual image paths
-    backgroundImage.src = 'background.jpg'; // Replace with your background image
-    playerImage.src = 'player.png';         // Replace with your player sprite
-    platformImage.src = 'platform.png';     // Replace with your platform image
-    
-    // Fallback for missing images
-    backgroundImage.onerror = () => {
+    platformImage.onerror = () => { // Added onerror for consistency
         imagesLoaded++;
         checkAllImagesLoaded();
     };
-    
-    playerImage.onerror = () => {
+
+    player1Image.onload = () => {
         imagesLoaded++;
         checkAllImagesLoaded();
     };
-    
-    platformImage.onerror = () => {
+    player1Image.onerror = () => {
         imagesLoaded++;
         checkAllImagesLoaded();
     };
+
+    player2Image.onload = () => {
+        imagesLoaded++;
+        checkAllImagesLoaded();
+    };
+    player2Image.onerror = () => {
+        imagesLoaded++;
+        checkAllImagesLoaded();
+    };
+
+    // Set image sources
+    backgroundImage.src = 'background.jpg';
+    platformImage.src = 'platform.png';
+    player1Image.src = 'player1.png'; // Path for Player 1's image
+    player2Image.src = 'player2.png'; // Path for Player 2's image
 }
 
 function checkAllImagesLoaded() {
@@ -279,8 +285,9 @@ function movePlayer(player, leftKey, rightKey) {
   }
   player.dx = moveDx + player.knockbackDx;
   player.x += player.dx;
-  if (player.x < 0) player.x = 0;
-  if (player.x + player.width > canvas.width) player.x = canvas.width - player.width;
+  // Removed the clamping logic here:
+  // if (player.x < 0) player.x = 0;
+  // if (player.x + player.width > canvas.width) player.x = canvas.width - player.width;
 
   player.knockbackDx *= 0.8;
   if (Math.abs(player.knockbackDx) < 0.1) player.knockbackDx = 0;
@@ -340,21 +347,34 @@ function updatePercentDisplay(player) {
 }
 
 function checkFallOff(player, spawnX) {
-  if (player.y > canvas.height) {
+  // Check for falling off the bottom
+  if (player.y > canvas.height + player.height) { // Added player.height for a bit more leeway
     if (player.stocks > 1) {
       player.stocks--;
       updateStockDisplay(player);
-      player.x = spawnX;
-      player.y = platform.y - player.height;
-      player.dy = 0;
-      player.jumping = false;
-      player.grounded = true;
-      player.jumpsLeft = MAX_JUMPS;
-      player.knockbackMultiplier = 1;
-      // Reset animation properties
-      player.squishFactor = 1;
-      player.stretchFactor = 1;
-      player.floatOffset = 0;
+      resetPlayer(player, spawnX, platform.y - player.height); // Use resetPlayer
+    } else {
+      player.stocks = 0;
+      updateStockDisplay(player);
+    }
+  }
+  // Check for falling off the left side
+  else if (player.x + player.width < -HORIZONTAL_BOUNDARY_OFFSET) {
+    if (player.stocks > 1) {
+      player.stocks--;
+      updateStockDisplay(player);
+      resetPlayer(player, spawnX, platform.y - player.height); // Use resetPlayer
+    } else {
+      player.stocks = 0;
+      updateStockDisplay(player);
+    }
+  }
+  // Check for falling off the right side
+  else if (player.x > canvas.width + HORIZONTAL_BOUNDARY_OFFSET) {
+    if (player.stocks > 1) {
+      player.stocks--;
+      updateStockDisplay(player);
+      resetPlayer(player, spawnX, platform.y - player.height); // Use resetPlayer
     } else {
       player.stocks = 0;
       updateStockDisplay(player);
@@ -500,7 +520,7 @@ function shootProjectile(player, key) {
     
     projectiles.push({
       x: player.x + (dir === 1 ? player.width : -chargedSize),
-      y: player.y + player.height / 2 - chargedSize/2,
+      y: player.y + (player.height * 2) / 2 - chargedSize/2, // Corrected Y-position
       width: chargedSize,
       height: chargedSize,
       dx: chargedSpeed * dir,
@@ -544,7 +564,8 @@ function updateProjectiles() {
       continue;
     }    
 
-    if (p.x < 0 || p.x > canvas.width) {
+    // Projectiles also disappear if they go too far off screen
+    if (p.x < -p.width || p.x > canvas.width + p.width) {
       projectiles.splice(i, 1);
     }
   }
@@ -558,7 +579,8 @@ function drawProjectileCharging(player) {
   // Draw projectile charging indicator - positioned for doubled player size
   const dir = player.facing;
   const chargedSize = Math.round(20 + (player.projectileChargeMultiplier - 1) * 15);
-  const projectileX = player.x + (dir === 1 ? player.width * 2 + 10 : -chargedSize - 10);
+  // Adjusted horizontal position for charging indicator
+  const projectileX = player.x + (dir === 1 ? player.width * 2 + 10 : player.x - chargedSize - 10);
   const projectileY = player.y + player.height * 2 / 2 - chargedSize/2;
   
   // Pulsing effect
@@ -609,14 +631,20 @@ function drawProjectiles() {
 }
 
 function resetPlayer(player, spawnX, spawnY) {
+  if (player.stocks === 3) {  
     player.x = spawnX;
     player.y = spawnY;
+  } else {
+    player.x = 750;
+    player.y = 200;
+  }
     player.dx = 0;
+    player.knockbackDx = 0;
     player.dy = 0;
     player.jumping = false;
     player.grounded = true;
     player.jumpsLeft = MAX_JUMPS;
-    player.stocks = 3;
+    // player.stocks is NOT reset here, it's handled by checkFallOff
     player.knockbackMultiplier = 1;
     player.charging = false;
     player.chargeTime = 0;
@@ -648,7 +676,7 @@ function resetKeyStates() {
 }
 
 function updateGame() {
-   movePlayer(player1, 'a', 'd');
+    movePlayer(player1, 'a', 'd');
     movePlayer(player2, 'ArrowLeft', 'ArrowRight');
 
     applyGravity(player1);
@@ -661,6 +689,7 @@ function updateGame() {
     player1.dx *= 0.95;
     player2.dx *= 0.95;
 
+    // Pass the initial spawnX to checkFallOff for each player
     checkFallOff(player1, platform.x + platform.width/7);
     checkFallOff(player2, platform.x + platform.width - 100);
 
@@ -692,6 +721,9 @@ function updateGame() {
 restartBtn.addEventListener('click', () => {
   gameOver = false;
   restartBtn.style.display = 'none';
+  // Reset players to initial state with 3 stocks
+  player1.stocks = 3;
+  player2.stocks = 3;
   resetPlayer(player1, platform.x + platform.width/7, platform.y - player1.height);
   resetPlayer(player2, platform.x + platform.width - 100, platform.y - player2.height);
   requestAnimationFrame(gameLoop);
@@ -728,8 +760,8 @@ function getDarkenedColor(baseColor, multiplier) {
 
 function drawPlayer(player) {
     // Calculate animated dimensions and position (doubled in size)
-    const animatedWidth = player.width * 2 * (player.grounded ? player.squishFactor : 1/player.stretchFactor);
-    const animatedHeight = player.height * 2 * (player.grounded ? 1/player.squishFactor : player.stretchFactor);
+    const animatedWidth = player.width * 1.5 * (player.grounded ? player.squishFactor : 1 / player.stretchFactor);
+    const animatedHeight = player.height * 1.5 * (player.grounded ? 1 / player.squishFactor : player.stretchFactor);
     
     // Adjust position to keep player centered during animation
     const animatedX = player.x + (player.width * 2 - animatedWidth) / 2;
@@ -742,6 +774,18 @@ function drawPlayer(player) {
         ctx.scale(-1, 1);
     }
     
+    // Determine which image to use
+    let currentPlayerImage;
+    if (player === player1) {
+        currentPlayerImage = player1Image;
+    } else if (player === player2) {
+        currentPlayerImage = player2Image;
+    } else {
+        // This block will never be hit with current game logic (only player1 and player2)
+        // Kept for robustness if more player types were added later.
+        currentPlayerImage = null; // No generic playerImage, so set to null
+    }
+
     // Add subtle rotation when in air for more dynamic feel
     if (!player.grounded && Math.abs(player.dx) > 2) {
         const centerX = player.facing === -1 ? -(animatedX + animatedWidth/2) : animatedX + animatedWidth/2;
@@ -750,9 +794,10 @@ function drawPlayer(player) {
         ctx.translate(centerX, centerY);
         ctx.rotate(player.dx * 0.02); // Slight rotation based on horizontal movement
         
-        if (playerImage.complete && playerImage.naturalWidth > 0) {
+        // Check if the specific player image is loaded and valid
+        if (currentPlayerImage && currentPlayerImage.complete && currentPlayerImage.naturalWidth > 0) {
             // Draw the image to fill the entire character hitbox
-            ctx.drawImage(playerImage, -animatedWidth/2, -animatedHeight/2, animatedWidth, animatedHeight);
+            ctx.drawImage(currentPlayerImage, -animatedWidth/2, -animatedHeight/2, animatedWidth, animatedHeight);
         } else {
             // Fallback to colored rectangle (keeping original player color)
             ctx.fillStyle = player.color;
@@ -762,9 +807,10 @@ function drawPlayer(player) {
         const drawX = player.facing === -1 ? -(animatedX + animatedWidth) : animatedX;
         const drawY = animatedY;
         
-        if (playerImage.complete && playerImage.naturalWidth > 0) {
+        // Check if the specific player image is loaded and valid
+        if (currentPlayerImage && currentPlayerImage.complete && currentPlayerImage.naturalWidth > 0) {
             // Draw the image to fill the entire character hitbox
-            ctx.drawImage(playerImage, drawX, drawY, animatedWidth, animatedHeight);
+            ctx.drawImage(currentPlayerImage, drawX, drawY, animatedWidth, animatedHeight);
         } else {
             // Fallback to colored rectangle (keeping original player color)
             ctx.fillStyle = player.color;
