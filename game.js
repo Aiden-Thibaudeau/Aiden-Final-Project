@@ -44,10 +44,15 @@ const platform = {
   height: 100,
 };
 
+/**
+ * Creates a new player object with default properties.
+ * @param {number} x - The initial x position of the player.
+ * @returns {Object} The player object.
+ */
 function createPlayer(x) {
-  return {
+  const player = {
     x: x,
-    y: platform.y - 50,
+    y: platform.y,
     width: 50,
     height: 50,
     speed: PLAYER_SPEED,
@@ -77,6 +82,8 @@ function createPlayer(x) {
     squishFactor: 1, // For landing squish effect
     stretchFactor: 1, // For jumping stretch effect
   };
+  console.log('Created player at x:', x);
+  return player;
 }
 
 // Global player objects, colors will be set during selection
@@ -103,70 +110,103 @@ const keys = {
   l: false,
 };
 
-// Image loading
+// Updated image loading system - removed platform image
 let imagesLoaded = 0;
-const totalImages = 4; // background, platform, player1, player2
+const totalImages = 11; // background + 10 player images (no platform image)
 let allImagesLoaded = false;
 
 const backgroundImage = new Image();
-const player1Image = new Image();
-const player2Image = new Image();
-const platformImage = new Image();
+// Removed platformImage
 
-// Image loading function
+// Create objects to store all player images
+const player1Images = {};
+const player2Images = {};
+
+// Color mapping for filenames
+const colorNames = {
+  '#FF6347': 'red',
+  '#4682B4': 'blue', 
+  '#32CD32': 'green',
+  '#FFD700': 'gold',
+  '#8A2BE2': 'purple'
+};
+
+// Image loading function - removed platform image loading
 function loadImages() {
+    console.log('Loading images...');
     backgroundImage.onload = () => {
         imagesLoaded++;
         checkAllImagesLoaded();
     };
-    backgroundImage.onerror = () => { // Added onerror for consistency
+    backgroundImage.onerror = () => {
         imagesLoaded++;
         checkAllImagesLoaded();
     };
 
-    platformImage.onload = () => {
-        imagesLoaded++;
-        checkAllImagesLoaded();
-    };
-    platformImage.onerror = () => { // Added onerror for consistency
-        imagesLoaded++;
-        checkAllImagesLoaded();
-    };
+    // Load all player 1 images
+    Object.entries(colorNames).forEach(([colorCode, colorName]) => {
+        const img = new Image();
+        img.onload = () => {
+            imagesLoaded++;
+            checkAllImagesLoaded();
+        };
+        img.onerror = () => {
+            imagesLoaded++;
+            checkAllImagesLoaded();
+        };
+        img.src = `player1${colorName}.png`;
+        player1Images[colorCode] = img;
+    });
 
-    player1Image.onload = () => {
-        imagesLoaded++;
-        checkAllImagesLoaded();
-    };
-    player1Image.onerror = () => {
-        imagesLoaded++;
-        checkAllImagesLoaded();
-    };
+    // Load all player 2 images
+    Object.entries(colorNames).forEach(([colorCode, colorName]) => {
+        const img = new Image();
+        img.onload = () => {
+            imagesLoaded++;
+            checkAllImagesLoaded();
+        };
+        img.onerror = () => {
+            imagesLoaded++;
+            checkAllImagesLoaded();
+        };
+        img.src = `player2${colorName}.png`;
+        player2Images[colorCode] = img;
+    });
 
-    player2Image.onload = () => {
-        imagesLoaded++;
-        checkAllImagesLoaded();
-    };
-    player2Image.onerror = () => {
-        imagesLoaded++;
-        checkAllImagesLoaded();
-    };
-
-    // Set image sources
+    // Set background image source
     backgroundImage.src = 'background.jpg';
-    platformImage.src = 'platform.png';
-    player1Image.src = 'player1.png'; // Path for Player 1's image
-    player2Image.src = 'player2.png'; // Path for Player 2's image
 }
 
+/**
+ * Checks if all images have finished loading and updates the flag.
+ */
 function checkAllImagesLoaded() {
     if (imagesLoaded >= totalImages) {
         allImagesLoaded = true;
+        console.log('All images loaded.');
     }
 }
 
-// New: Character selection logic
-const colors = ['#FF6347', '#4682B4', '#32CD32', '#FFD700', '#8A2BE2'];
+/**
+ * Returns the correct player image based on the player and their color.
+ * @param {Object} player - The player object.
+ * @returns {HTMLImageElement|null} The image element or null if not found.
+ */
+function getPlayerImage(player) {
+    if (player === player1) {
+        return player1Images[player.color] || null;
+    } else if (player === player2) {
+        return player2Images[player.color] || null;
+    }
+    return null;
+}
 
+/**
+ * Sets up color selection UI for a player and updates preview on selection.
+ * @param {HTMLElement} playerColorOptions - The color options container.
+ * @param {HTMLElement} playerPreview - The preview element.
+ * @param {number} playerNumber - 1 for player1, 2 for player2.
+ */
 function setupColorSelection(playerColorOptions, playerPreview, playerNumber) {
     playerColorOptions.querySelectorAll('.color-box').forEach(box => {
         const color = box.dataset.color;
@@ -187,9 +227,11 @@ function setupColorSelection(playerColorOptions, playerPreview, playerNumber) {
             if (playerNumber === 1) {
                 player1SelectedColor = color;
                 player1Preview.style.backgroundColor = color;
+                console.log('Player 1 selected color:', color);
             } else {
                 player2SelectedColor = color;
                 player2Preview.style.backgroundColor = color;
+                console.log('Player 2 selected color:', color);
             }
         });
     });
@@ -201,6 +243,7 @@ setupColorSelection(player2ColorOptions, player2Preview, 2);
 
 // Start Game Button Logic
 startGameBtn.addEventListener('click', () => {
+    console.log('Game started!');
     characterSelectScreen.style.display = 'none';
     gameUI.style.display = 'block'; // Show game UI
     gameStarted = true;
@@ -240,6 +283,10 @@ window.addEventListener('keyup', (e) => {
   if (e.key in keys) keys[e.key] = false;
 });
 
+/**
+ * Updates the animation state for a player (stretch, squish, float, etc).
+ * @param {Object} player - The player object.
+ */
 function updatePlayerAnimation(player) {
   // Update animation frame counter
   player.animationFrame++;
@@ -272,8 +319,18 @@ function updatePlayerAnimation(player) {
   } else {
     player.floatOffset = 0;
   }
+  // Log animation state occasionally
+  if (player.animationFrame % 60 === 0) {
+    console.log('Player animationFrame:', player.animationFrame, 'stretch:', player.stretchFactor, 'squish:', player.squishFactor);
+  }
 }
 
+/**
+ * Handles left/right movement for a player based on key input.
+ * @param {Object} player - The player object.
+ * @param {string} leftKey - Key for moving left.
+ * @param {string} rightKey - Key for moving right.
+ */
 function movePlayer(player, leftKey, rightKey) {
   let moveDx = 0;
   if (keys[leftKey]) {
@@ -285,30 +342,38 @@ function movePlayer(player, leftKey, rightKey) {
   }
   player.dx = moveDx + player.knockbackDx;
   player.x += player.dx;
-  // Removed the clamping logic here:
-  // if (player.x < 0) player.x = 0;
-  // if (player.x + player.width > canvas.width) player.x = canvas.width - player.width;
+  if (moveDx !== 0) {
+    console.log('Player moving', moveDx > 0 ? 'right' : 'left', 'to x:', player.x);
+  }
 
   player.knockbackDx *= 0.8;
   if (Math.abs(player.knockbackDx) < 0.1) player.knockbackDx = 0;
 }
 
+/**
+ * Applies gravity and platform collision for a player.
+ * @param {Object} player - The player object.
+ */
 function applyGravity(player) {
   const wasGrounded = player.grounded;
   player.dy += GRAVITY;
   const nextY = player.y + player.dy;
 
+  // Use the actual rendered height (doubled) for collision detection
+  const playerRenderHeight = player.height * 2;
+
   const onPlatform = (
     player.dy > 0 &&
-    player.y + player.height <= platform.y &&
-    nextY + player.height >= platform.y &&
+    player.y + playerRenderHeight <= platform.y &&
+    nextY + playerRenderHeight >= platform.y &&
     player.x + player.width > platform.x &&
     player.x < platform.x + platform.width
   );
 
   if (onPlatform) {
     player.dy = 0;
-    player.y = platform.y - player.height;
+    // Position player so their bottom edge sits on top of platform
+    player.y = platform.y - playerRenderHeight;
     player.grounded = true;
     player.jumping = false;
     player.jumpsLeft = MAX_JUMPS;
@@ -316,6 +381,7 @@ function applyGravity(player) {
     // Add landing squish effect if just landed
     if (!wasGrounded && player.dy > 8) {
       player.squishFactor = 0.7; // Squish down
+      console.log('Player landed with squish! Y:', player.y);
     } else if (!wasGrounded) {
       player.squishFactor = 0.85; // Light squish
     }
@@ -326,6 +392,10 @@ function applyGravity(player) {
   player.y += player.dy;
 }
 
+/**
+ * Updates the stock (lives) display for a player in the UI.
+ * @param {Object} player - The player object.
+ */
 function updateStockDisplay(player) {
   const containerId = player === player1 ? 'player1Stock' : 'player2Stock';
   const stockContainer = document.getElementById(containerId);
@@ -339,6 +409,10 @@ function updateStockDisplay(player) {
   }
 }
 
+/**
+ * Updates the percent (damage) display for a player in the UI.
+ * @param {Object} player - The player object.
+ */
 function updatePercentDisplay(player) {
   const percentId = player === player1 ? 'player1Percent' : 'player2Percent';
   const percentContainer = document.getElementById(percentId);
@@ -346,13 +420,21 @@ function updatePercentDisplay(player) {
   percentContainer.textContent = `${Math.round((player.knockbackMultiplier - 1) * 10)}%`;
 }
 
+/**
+ * Checks if a player has fallen off the stage and handles stock loss/reset.
+ * @param {Object} player - The player object.
+ * @param {number} spawnX - The x position to respawn at.
+ */
 function checkFallOff(player, spawnX) {
+  const playerRenderHeight = player.height * 2;
+  
   // Check for falling off the bottom
-  if (player.y > canvas.height + player.height) { // Added player.height for a bit more leeway
+  if (player.y > canvas.height + playerRenderHeight) {
+    console.log('Player fell off bottom! Stocks left:', player.stocks - 1);
     if (player.stocks > 1) {
       player.stocks--;
       updateStockDisplay(player);
-      resetPlayer(player, spawnX, platform.y - player.height); // Use resetPlayer
+      resetPlayer(player, spawnX, platform.y - playerRenderHeight);
     } else {
       player.stocks = 0;
       updateStockDisplay(player);
@@ -360,10 +442,11 @@ function checkFallOff(player, spawnX) {
   }
   // Check for falling off the left side
   else if (player.x + player.width < -HORIZONTAL_BOUNDARY_OFFSET) {
+    console.log('Player fell off left! Stocks left:', player.stocks - 1);
     if (player.stocks > 1) {
       player.stocks--;
       updateStockDisplay(player);
-      resetPlayer(player, spawnX, platform.y - player.height); // Use resetPlayer
+      resetPlayer(player, spawnX, platform.y - playerRenderHeight);
     } else {
       player.stocks = 0;
       updateStockDisplay(player);
@@ -371,10 +454,11 @@ function checkFallOff(player, spawnX) {
   }
   // Check for falling off the right side
   else if (player.x > canvas.width + HORIZONTAL_BOUNDARY_OFFSET) {
+    console.log('Player fell off right! Stocks left:', player.stocks - 1);
     if (player.stocks > 1) {
       player.stocks--;
       updateStockDisplay(player);
-      resetPlayer(player, spawnX, platform.y - player.height); // Use resetPlayer
+      resetPlayer(player, spawnX, platform.y - playerRenderHeight);
     } else {
       player.stocks = 0;
       updateStockDisplay(player);
@@ -382,12 +466,19 @@ function checkFallOff(player, spawnX) {
   }
 }
 
+/**
+ * Handles punch charging, punching, and punch collision/knockback.
+ * @param {Object} attacker - The player attacking.
+ * @param {Object} defender - The player being attacked.
+ * @param {string} punchKey - The key for punching.
+ */
 function handlePunching(attacker, defender, punchKey) {
   // Handle charging
   if (keys[punchKey] && attacker.punchCooldown <= 0 && !attacker.punching) {
     if (!attacker.charging) {
       attacker.charging = true;
       attacker.chargeTime = 0;
+      console.log('Player started charging punch');
     } else {
       // Continue charging
       attacker.chargeTime = Math.min(attacker.chargeTime + 1, MAX_CHARGE_TIME);
@@ -405,6 +496,7 @@ function handlePunching(attacker, defender, punchKey) {
     attacker.punching = true;
     attacker.punchTimer = PUNCH_DURATION;
     attacker.punchCooldown = PUNCH_COOLDOWN;
+    console.log('Player released punch! Multiplier:', attacker.chargeMultiplier.toFixed(2));
   }
 
   if (attacker.punching) {
@@ -425,6 +517,7 @@ function handlePunching(attacker, defender, punchKey) {
         punchY < defender.y + defender.height * 2 &&
         punchY + punchHeight > defender.y
       ) {
+        console.log('Punch hit! Defender knockbackMultiplier:', defender.knockbackMultiplier.toFixed(2));
         const knockDirection = attacker.facing;
         // Apply charge multiplier to knockback and damage
         const chargedKnockback = KNOCKBACK_FORCE * attacker.chargeMultiplier;
@@ -445,59 +538,70 @@ function handlePunching(attacker, defender, punchKey) {
   }
 }
 
+/**
+ * Draws the punch or charge effect for a player.
+ * @param {Object} player - The player object.
+ * @param {string} color - The color to use for the punch effect.
+ */
 function drawPunch(player, color) {
-  if (!player.punching && !player.charging) return;
+    if (!player.punching && !player.charging) return;
 
-  const punchWidth = 60;
-  const punchHeight = 30;
-  // Fixed visual punch positioning to match doubled player size
-  const punchX = player.facing === 1 ? player.x + player.width * 2 + 10 : player.x - punchWidth - 10;
-  const punchY = player.y + (player.height * 2) / 3;
+    const punchWidth = 60;
+    const punchHeight = 30;
+    // Adjusted visual punch positioning
+    const punchX = player.facing === 1 ? player.x + player.width * 2 - 10 : player.x - punchWidth + 10; // Moved 10px closer
+    const punchY = player.y + (player.height * 2) / 2; // Moved further down
 
-  if (player.punching) {
-    // Draw punch with intensity based on charge
-    const alpha = 0.3 + (player.chargeMultiplier - 1) * 0.4;
-    ctx.fillStyle = color;
-    ctx.globalAlpha = alpha;
-    ctx.fillRect(punchX, punchY, punchWidth, punchHeight);
-    ctx.globalAlpha = 1;
-  } else if (player.charging) {
-    // Draw charging indicator
-    const chargeProgress = player.chargeTime / MAX_CHARGE_TIME;
-    const chargeAlpha = 0.2 + chargeProgress * 0.6;
-    
-    // Pulsing effect
-    const pulse = Math.sin(player.chargeTime * 0.3) * 0.2 + 0.8;
-    
-    ctx.fillStyle = color;
-    ctx.globalAlpha = chargeAlpha * pulse;
-    ctx.fillRect(punchX, punchY, punchWidth, punchHeight);
-    
-    // Draw charge bar above player - positioned correctly for doubled size
-    const barWidth = 60;
-    const barHeight = 8;
-    const barX = player.x + (player.width * 2 - barWidth) / 2; // Center above player
-    const barY = player.y - 15;
-    
-    // Background bar
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
-    ctx.fillRect(barX, barY, barWidth, barHeight);
-    
-    // Charge progress bar
-    ctx.fillStyle = `rgba(255, ${255 - chargeProgress * 255}, 0, 0.8)`;
-    ctx.fillRect(barX, barY, barWidth * chargeProgress, barHeight);
-    
-    ctx.globalAlpha = 1;
-  }
+    if (player.punching) {
+        // Draw punch with intensity based on charge
+        const alpha = 0.3 + (player.chargeMultiplier - 1) * 0.4;
+        ctx.fillStyle = color;
+        ctx.globalAlpha = alpha;
+        ctx.fillRect(punchX, punchY, punchWidth, punchHeight);
+        ctx.globalAlpha = 1;
+    } else if (player.charging) {
+        // Draw charging indicator
+        const chargeProgress = player.chargeTime / MAX_CHARGE_TIME;
+        const chargeAlpha = 0.2 + chargeProgress * 0.6;
+
+        // Pulsing effect
+        const pulse = Math.sin(player.chargeTime * 0.3) * 0.2 + 0.8;
+
+        ctx.fillStyle = color;
+        ctx.globalAlpha = chargeAlpha * pulse;
+        ctx.fillRect(punchX, punchY, punchWidth, punchHeight);
+
+        // Draw charge bar above player - positioned correctly for doubled size
+        const barWidth = 60;
+        const barHeight = 8;
+        const barX = player.x + (player.width * 2 - barWidth) / 2; // Center above player
+        const barY = player.y - 15;
+
+        // Background bar
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+        ctx.fillRect(barX, barY, barWidth, barHeight);
+
+        // Charge progress bar
+        ctx.fillStyle = `rgba(255, ${255 - chargeProgress * 255}, 0, 0.8)`;
+        ctx.fillRect(barX, barY, barWidth * chargeProgress, barHeight);
+
+        ctx.globalAlpha = 1;
+    }
 }
 
 
+/**
+ * Handles projectile charging, firing, and cooldown for a player.
+ * @param {Object} player - The player object.
+ * @param {string} key - The key for shooting projectiles.
+ */
 function shootProjectile(player, key) {
   // Handle projectile charging
   if (keys[key] && player.projectileCooldown <= 0) {
     if (!player.chargingProjectile) {
       player.chargingProjectile = true;
       player.projectileChargeTime = 0;
+      console.log('Player started charging projectile');
     } else {
       // Continue charging
       player.projectileChargeTime = Math.min(player.projectileChargeTime + 1, MAX_CHARGE_TIME);
@@ -527,6 +631,7 @@ function shootProjectile(player, key) {
       owner: player,
       chargeMultiplier: player.projectileChargeMultiplier
     });
+    console.log('Player fired projectile! Multiplier:', player.projectileChargeMultiplier.toFixed(2));
     
     player.projectileCooldown = PROJECTILE_COOLDOWN;
     player.projectileChargeMultiplier = 1; // Reset charge multiplier
@@ -537,6 +642,9 @@ function shootProjectile(player, key) {
   }
 }
 
+/**
+ * Updates all projectiles, moves them, checks for collisions, and applies effects.
+ */
 function updateProjectiles() {
   for (let i = projectiles.length - 1; i >= 0; i--) {
     const p = projectiles[i];
@@ -549,6 +657,7 @@ function updateProjectiles() {
       p.y < target.y + target.height &&
       p.y + p.height > target.y
     ) {
+      console.log('Projectile hit! Target knockbackMultiplier:', target.knockbackMultiplier.toFixed(2));
       // Apply knockback using projectile's charge multiplier
       const chargedKnockback = PROJECTILE_KNOCKBACK * (p.chargeMultiplier || 1);
       const chargeDamage = 0.2 * (p.chargeMultiplier || 1);
@@ -566,11 +675,16 @@ function updateProjectiles() {
 
     // Projectiles also disappear if they go too far off screen
     if (p.x < -p.width || p.x > canvas.width + p.width) {
+      console.log('Projectile removed (off screen)');
       projectiles.splice(i, 1);
     }
   }
 }
 
+/**
+ * Draws the projectile charging indicator for a player.
+ * @param {Object} player - The player object.
+ */
 function drawProjectileCharging(player) {
   if (!player.chargingProjectile) return;
   
@@ -579,8 +693,9 @@ function drawProjectileCharging(player) {
   // Draw projectile charging indicator - positioned for doubled player size
   const dir = player.facing;
   const chargedSize = Math.round(20 + (player.projectileChargeMultiplier - 1) * 15);
-  // Adjusted horizontal position for charging indicator
-  const projectileX = player.x + (dir === 1 ? player.width * 2 + 10 : player.x - chargedSize - 10);
+  
+  // FIXED: Corrected horizontal position calculation
+  const projectileX = dir === 1 ? player.x + player.width * 2 + 10 : player.x - chargedSize - 10;
   const projectileY = player.y + player.height * 2 / 2 - chargedSize/2;
   
   // Pulsing effect
@@ -609,7 +724,9 @@ function drawProjectileCharging(player) {
   ctx.globalAlpha = 1;
 }
 
-
+/**
+ * Draws all active projectiles on the canvas.
+ */
 function drawProjectiles() {
   projectiles.forEach(p => {
     // Color intensity based on charge
@@ -630,10 +747,15 @@ function drawProjectiles() {
   });
 }
 
-function resetPlayer(player, spawnX, spawnY) {
+/**
+ * Resets a player's state and position after losing a stock or starting a game.
+ * @param {Object} player - The player object.
+ * @param {number} spawnX - The x position to respawn at.
+ */
+function resetPlayer(player, spawnX,) {
   if (player.stocks === 3) {  
     player.x = spawnX;
-    player.y = spawnY;
+    player.y = 110;
   } else {
     player.x = 750;
     player.y = 200;
@@ -669,12 +791,18 @@ function resetPlayer(player, spawnX, spawnY) {
     resetKeyStates();
 }
 
+/**
+ * Resets all key states to false (no keys pressed).
+ */
 function resetKeyStates() {
   for (const key in keys) {
     keys[key] = false;
   }
 }
 
+/**
+ * Updates all game logic for one frame (movement, attacks, projectiles, etc).
+ */
 function updateGame() {
     movePlayer(player1, 'a', 'd');
     movePlayer(player2, 'ArrowLeft', 'ArrowRight');
@@ -704,6 +832,7 @@ function updateGame() {
     if (!gameOver && (player1.stocks <= 0 || player2.stocks <= 0)) {
         gameOver = true;
         restartBtn.style.display = 'block';
+        console.log('Game over! Winner:', player1.stocks <= 0 ? 'Player 2' : 'Player 1');
     }
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -719,6 +848,7 @@ function updateGame() {
 }
 
 restartBtn.addEventListener('click', () => {
+  console.log('Game restarted!');
   gameOver = false;
   restartBtn.style.display = 'none';
   // Reset players to initial state with 3 stocks
@@ -729,6 +859,9 @@ restartBtn.addEventListener('click', () => {
   requestAnimationFrame(gameLoop);
 });
 
+/**
+ * Draws the winner text overlay when the game ends.
+ */
 function drawWinnerText() {
   ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -739,6 +872,12 @@ function drawWinnerText() {
   ctx.fillText(`${player1.stocks <= 0 ? 'Player 2' : 'Player 1'} Wins!`, canvas.width / 2, canvas.height / 2 - 60);
 }
 
+/**
+ * Returns a darkened version of a color based on a multiplier (for damage effects).
+ * @param {string} baseColor - The base color in hex.
+ * @param {number} multiplier - The knockback multiplier.
+ * @returns {string} The darkened RGB color string.
+ */
 function getDarkenedColor(baseColor, multiplier) {
     const maxMultiplier = 10;
     const factor = Math.min(multiplier / maxMultiplier, 1); // clamp between 0 and 1
@@ -758,6 +897,10 @@ function getDarkenedColor(baseColor, multiplier) {
     return `rgb(${Math.round(r * darken)}, ${Math.round(g * darken)}, ${Math.round(b * darken)})`;
 }
 
+/**
+ * Draws a player character with animation, color, and facing direction.
+ * @param {Object} player - The player object.
+ */
 function drawPlayer(player) {
     // Calculate animated dimensions and position (doubled in size)
     const animatedWidth = player.width * 1.5 * (player.grounded ? player.squishFactor : 1 / player.stretchFactor);
@@ -774,17 +917,8 @@ function drawPlayer(player) {
         ctx.scale(-1, 1);
     }
     
-    // Determine which image to use
-    let currentPlayerImage;
-    if (player === player1) {
-        currentPlayerImage = player1Image;
-    } else if (player === player2) {
-        currentPlayerImage = player2Image;
-    } else {
-        // This block will never be hit with current game logic (only player1 and player2)
-        // Kept for robustness if more player types were added later.
-        currentPlayerImage = null; // No generic playerImage, so set to null
-    }
+    // Get the correct image based on player and selected color
+    const currentPlayerImage = getPlayerImage(player);
 
     // Add subtle rotation when in air for more dynamic feel
     if (!player.grounded && Math.abs(player.dx) > 2) {
@@ -821,18 +955,81 @@ function drawPlayer(player) {
     ctx.restore();
 }
 
-
+/**
+ * Draws the platform using canvas gradients and lines.
+ */
 function drawPlatform() {
-    if (platformImage.complete && platformImage.naturalWidth > 0) {
-        // Draw platform image, stretching to fit platform dimensions
-        ctx.drawImage(platformImage, platform.x, platform.y, platform.width, platform.height);
-    } else {
-        // Fallback to colored rectangle
-        ctx.fillStyle = '#8B4513';
-        ctx.fillRect(platform.x, platform.y, platform.width, platform.height);
+    const x = platform.x;
+    const y = platform.y;
+    const width = platform.width;
+    const height = platform.height;
+    
+    // Save the current state
+    ctx.save();
+    
+    // Create gradient for platform surface
+    const surfaceGradient = ctx.createLinearGradient(x, y, x, y + height * 0.3);
+    surfaceGradient.addColorStop(0, '#D2B48C'); // Light tan
+    surfaceGradient.addColorStop(1, '#8B7355'); // Darker tan
+    
+    // Create gradient for platform sides
+    const sideGradient = ctx.createLinearGradient(x, y + height * 0.3, x, y + height);
+    sideGradient.addColorStop(0, '#8B7355'); // Darker tan
+    sideGradient.addColorStop(0.5, '#654321'); // Brown
+    sideGradient.addColorStop(1, '#2F1B14'); // Dark brown
+    
+    // Draw platform top surface
+    ctx.fillStyle = surfaceGradient;
+    ctx.fillRect(x, y, width, height * 0.3);
+    
+    // Draw platform sides/base
+    ctx.fillStyle = sideGradient;
+    ctx.fillRect(x, y + height * 0.3, width, height * 0.7);
+    
+    // Add some texture lines to make it look more wooden
+    ctx.strokeStyle = '#654321';
+    ctx.lineWidth = 2;
+    
+    // Horizontal grain lines
+    for (let i = 1; i < 4; i++) {
+        const lineY = y + (height * 0.3 * i / 4);
+        ctx.beginPath();
+        ctx.moveTo(x + 10, lineY);
+        ctx.lineTo(x + width - 10, lineY);
+        ctx.stroke();
     }
+    
+    // Vertical wood grain lines
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = '#5D4E37';
+    for (let i = 0; i < 8; i++) {
+        const lineX = x + (width * (i + 1) / 9);
+        ctx.beginPath();
+        ctx.moveTo(lineX, y + height * 0.3);
+        ctx.lineTo(lineX, y + height);
+        ctx.stroke();
+    }
+    
+    // Add platform edge highlight
+    ctx.strokeStyle = '#F5DEB3';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.lineTo(x + width, y);
+    ctx.stroke();
+    
+    // Add platform shadow/outline
+    ctx.strokeStyle = '#2F1B14';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(x, y, width, height);
+    
+    // Restore the previous state
+    ctx.restore();
 }
 
+/**
+ * Draws the background image or a fallback gradient.
+ */
 function drawBackground() {
     if (backgroundImage.complete && backgroundImage.naturalWidth > 0) {
         // Draw background image, scaling to fit canvas
@@ -847,7 +1044,9 @@ function drawBackground() {
     }
 }
 
-
+/**
+ * The main game loop: updates and draws the game each frame.
+ */
 function gameLoop() {
     if (!gameStarted) {
         // Do nothing if game hasn't started yet, character select screen is active
