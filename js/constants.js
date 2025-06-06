@@ -35,7 +35,7 @@ export const characterStats = {
         speed: 10,
         jumpStrength: 20,
         maxJumps: 2,
-        punchPower: 1.2,
+        punchPower: 1,
         punchSpeed: 1.0,
         projectileSpeed: 1.0,
         projectilePower: 1.0,
@@ -43,29 +43,29 @@ export const characterStats = {
     },
     '#4682B4': { // Blue - Heavy hitter
         speed: 7,
-        jumpStrength: 18,
+        jumpStrength: 16,
         maxJumps: 2,
-        punchPower: 1.5,
+        punchPower: 2,
         punchSpeed: 0.7,
         projectileSpeed: 0.8,
-        projectilePower: 1.2,
-        weight: 1.3
+        projectilePower: 1.5,
+        weight: 1.4
     },
     '#32CD32': { // Green - Fast and agile
         speed: 13,
-        jumpStrength: 22,
-        maxJumps: 3,
-        punchPower: 0.8,
-        punchSpeed: 1.3,
-        projectileSpeed: 1.2,
-        projectilePower: 0.8,
-        weight: 0.8
+        jumpStrength: 24,
+        maxJumps: 2,
+        punchPower: 0.7,
+        punchSpeed: 1.5,
+        projectileSpeed: 1.5,
+        projectilePower: 0.7,
+        weight: 0.7
     },
     '#FFD700': { // Yellow - Projectile specialist
         speed: 10,
-        jumpStrength: 19,
+        jumpStrength: 20,
         maxJumps: 2,
-        punchPower: 0.9,
+        punchPower: 0.8,
         punchSpeed: 1.0,
         projectileSpeed: 1.4,
         projectilePower: 1.4,
@@ -77,8 +77,43 @@ export const characterStats = {
         maxJumps: 2,
         punchPower: 1.1,
         punchSpeed: 1.1,
-        projectileSpeed: 1.1,
-        projectilePower: 1.1,
+        projectileSpeed: 1.4,
+        projectilePower: 1,
         weight: 1.0
+    }
+};
+
+// Stage configurations
+export const stageLayouts = {
+    classic: {
+        platforms: [
+            { x: 0.25, y: 0.5, width: 0.5, height: 100 }
+        ],
+        spawns: {
+            player1: { x: 0.3, y: 0.3 },  // 30% from left, 30% from top
+            player2: { x: 0.7, y: 0.3 }   // 70% from left, 30% from top
+        }
+    },
+    floating: {
+        platforms: [
+            { x: 0.25, y: 0.5, width: 0.5, height: 100 },
+            { x: 0.1, y: 0.3, width: 0.2, height: 100 },
+            { x: 0.7, y: 0.3, width: 0.2, height: 100 }
+        ],
+        spawns: {
+            player1: { x: 0.2, y: 0.15 },
+            player2: { x: 0.8, y: 0.15 }
+        }
+    },
+    challenge: {
+        platforms: [
+            { x: 0.35, y: 0.5, width: 0.3, height: 100 },
+            { x: 0.1, y: 0.35, width: 0.15, height: 100 },
+            { x: 0.75, y: 0.35, width: 0.15, height: 100 }
+        ],
+        spawns: {
+            player1: { x: 0.15, y: 0.2 },
+            player2: { x: 0.85, y: 0.2 }
+        }
     }
 };

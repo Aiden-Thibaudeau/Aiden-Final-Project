@@ -20,30 +20,37 @@ export function drawBackground(ctx) {
 let platformGradients = null;
 
 /**
- * Draw the platform
+ * Draw all platforms
+ */
+export function drawPlatforms(ctx, platforms) {
+    platforms.forEach(platform => {
+        drawPlatform(ctx, platform);
+    });
+}
+
+/**
+ * Draw a single platform
  */
 export function drawPlatform(ctx, platform) {
     const { x, y, width, height } = platform;
     
-    // Create gradients only once
-    if (!platformGradients) {
-        platformGradients = {
-            main: createPlatformMainGradient(ctx, y, height),
-            surface: createPlatformSurfaceGradient(ctx, y, height)
-        };
-    }
+    // Create gradients for this platform
+    const gradients = {
+        main: createPlatformMainGradient(ctx, y, height),
+        surface: createPlatformSurfaceGradient(ctx, y, height)
+    };
     
     ctx.save();
     
     // Main platform body
-    ctx.fillStyle = platformGradients.main;
+    ctx.fillStyle = gradients.main;
     ctx.fillRect(x, y, width, height);
     
     // Surface
-    ctx.fillStyle = platformGradients.surface;
+    ctx.fillStyle = gradients.surface;
     ctx.fillRect(x, y, width, height * 0.2);
     
-    // Simplified runes and energy lines for better performance
+    // Platform effects
     drawPlatformEffects(ctx, x, y, width, height);
     
     ctx.restore();

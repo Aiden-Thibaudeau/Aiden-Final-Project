@@ -125,27 +125,33 @@ export function movePlayer(player, leftKey, rightKey) {
 /**
  * Apply gravity and handle platform collision
  */
-export function applyGravity(player, platform) {
+export function applyGravity(player, platforms) {
     const wasGrounded = player.grounded;
     player.dy += GRAVITY;
     const nextY = player.y + player.dy;
 
     const playerRenderHeight = player.height * 2;
 
-    const onPlatform = (
-        player.dy > 0 &&
-        player.y + playerRenderHeight <= platform.y &&
-        nextY + playerRenderHeight >= platform.y &&
-        player.x + player.width > platform.x &&
-        player.x < platform.x + platform.width
-    );
+    // Check collision with all platforms
+    let landingPlatform = null;
+    
+    for (const platform of platforms) {
+        if (player.dy > 0 &&
+            player.y + playerRenderHeight <= platform.y &&
+            nextY + playerRenderHeight >= platform.y &&
+            player.x + player.width > platform.x &&
+            player.x < platform.x + platform.width) {
+            landingPlatform = platform;
+            break;
+        }
+    }
 
-    if (onPlatform) {
+    if (landingPlatform) {
         player.dy = 0;
-        player.y = platform.y - playerRenderHeight;
+        player.y = landingPlatform.y - playerRenderHeight;
         player.grounded = true;
         player.jumping = false;
-        player.jumpsLeft = player.maxJumps; // Use player-specific maxJumps
+        player.jumpsLeft = player.maxJumps;
         
         if (!wasGrounded && player.dy > 8) {
             player.squishFactor = 0.7;
@@ -154,9 +160,16 @@ export function applyGravity(player, platform) {
         }
     } else {
         player.grounded = false;
+        player.y = nextY;
     }
+}
 
-    player.y += player.dy;
+/**
+ * Check if player has fallen off the stage
+ */
+export function checkFallOffStage(player, canvas) {
+    const margin = 100; // How far below the canvas before counting as fallen
+    return player.y > canvas.height + margin;
 }
 
 /**
@@ -168,7 +181,7 @@ export function resetPlayer(player, spawnX, spawnY) {
     
     if (player.stocks === 3) {
         player.x = spawnX;
-        player.y = 110;
+        player.y = 50;
     } else {
         player.x = 700; 
         player.y = 110;

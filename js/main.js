@@ -16,6 +16,7 @@ import {
 import { 
     drawBackground,
     drawPlatform,
+    drawPlatforms,
     drawPlayer,
     drawPunch,
     drawProjectileCharging,
@@ -24,9 +25,10 @@ import {
 } from './render.js';
 import {
     elements,
-    ctx,
+    getContext,
     player1SelectedColor,
     player2SelectedColor,
+    selectedStage,
     initializeUI,
     showGameUI,
     toggleRestartButton,
@@ -48,17 +50,36 @@ let currentFps = 0;
 elements.canvas.width = window.innerWidth;
 elements.canvas.height = window.innerHeight;
 
-// Create platform
-const platform = {
-    x: elements.canvas.width / 4,
-    y: elements.canvas.height / 2,
-    width: elements.canvas.width / 2,
-    height: 100
-};
+// Import stage layouts
+import { stageLayouts } from './constants.js';
 
-// Create players
-const player1 = createPlayer(platform.x + platform.width/7, platform.y);
-const player2 = createPlayer(platform.x + platform.width - 100, platform.y);
+// Initialize empty platforms array
+let platforms = [];
+
+// Function to create platforms based on selected stage
+function createPlatforms(stageName) {
+    const layout = stageLayouts[stageName];
+    return layout.platforms.map(p => ({
+        x: p.x * elements.canvas.width,
+        y: p.y * elements.canvas.height,
+        width: p.width * elements.canvas.width,
+        height: p.height
+    }));
+}
+
+// Create initial platforms based on classic layout
+const initialPlatforms = createPlatforms('classic');
+
+// Create players at initial positions based on classic layout
+const initialLayout = stageLayouts['classic'];
+const player1 = createPlayer(
+    initialLayout.spawns.player1.x * elements.canvas.width,
+    initialLayout.spawns.player1.y * elements.canvas.height
+);
+const player2 = createPlayer(
+    initialLayout.spawns.player2.x * elements.canvas.width,
+    initialLayout.spawns.player2.y * elements.canvas.height
+);
 
 // Initialize stock display
 updateStockDisplay(player1, true);
@@ -94,19 +115,34 @@ function startGame() {
     gameStarted = true;
     gameOver = false;
     
-    // Reset stocks
+    // Create platforms for selected stage
+    platforms = createPlatforms(selectedStage);
+    console.log('Created platforms for stage:', selectedStage, platforms);
+    
+    // Reset stocks and positions
     player1.stocks = 3;
     player2.stocks = 3;
+    
+    // Set initial positions based on stage layout
+    const layout = stageLayouts[selectedStage];
+    player1.x = layout.spawns.player1.x * elements.canvas.width;
+    player1.y = layout.spawns.player1.y * elements.canvas.height;
+    player2.x = layout.spawns.player2.x * elements.canvas.width;
+    player2.y = layout.spawns.player2.y * elements.canvas.height;
 
     // Set player colors and apply their stats
     player1.color = player1SelectedColor;
     player2.color = player2SelectedColor;
     applyColorStats(player1, player1SelectedColor);
     applyColorStats(player2, player2SelectedColor);
-    
-    // Reset players
-    resetPlayer(player1, platform.x + platform.width/7, platform.y);
-    resetPlayer(player2, platform.x + platform.width - 100, platform.y);
+      // Reset players to their spawn positions
+    const spawnLayout = stageLayouts[selectedStage];
+    resetPlayer(player1, 
+        spawnLayout.spawns.player1.x * elements.canvas.width,
+        spawnLayout.spawns.player1.y * elements.canvas.height);
+    resetPlayer(player2,
+        spawnLayout.spawns.player2.x * elements.canvas.width,
+        spawnLayout.spawns.player2.y * elements.canvas.height);
     
     // Show game UI and update displays
     showGameUI();
@@ -136,10 +172,14 @@ function restartGame() {
     // Reapply color stats before resetting players
     applyColorStats(player1, player1.color);
     applyColorStats(player2, player2.color);
-    
-    // Reset players
-    resetPlayer(player1, platform.x + platform.width/7, platform.y);
-    resetPlayer(player2, platform.x + platform.width - 100, platform.y);
+      // Reset players to their spawn positions
+    const respawnLayout = stageLayouts[selectedStage];
+    resetPlayer(player1, 
+        respawnLayout.spawns.player1.x * elements.canvas.width,
+        respawnLayout.spawns.player1.y * elements.canvas.height);
+    resetPlayer(player2,
+        respawnLayout.spawns.player2.x * elements.canvas.width,
+        respawnLayout.spawns.player2.y * elements.canvas.height);
     
     // Reset keys
     resetKeyStates();
@@ -151,23 +191,28 @@ function restartGame() {
 /**
  * Check if player fell off stage
  */
-function checkFallOff(player, spawnX) {
+function checkFallOff(player, isPlayer1) {
     const playerRenderHeight = player.height * 2;
+    const layout = stageLayouts[selectedStage];
     
-    // Check for falling off the bottom
-    if (player.y > elements.canvas.height + playerRenderHeight) {
-        console.log('Player fell off bottom!');
-        handlePlayerLoss(player, spawnX);
-    }
-    // Check for falling off the left side
-    else if (player.x + player.width < -150) {
-        console.log('Player fell off left!');
-        handlePlayerLoss(player, spawnX);
-    }
-    // Check for falling off the right side
-    else if (player.x > elements.canvas.width + 150) {
-        console.log('Player fell off right!');
-        handlePlayerLoss(player, spawnX);
+    // Check for falling off the stage
+    if (player.y > elements.canvas.height + playerRenderHeight ||
+        player.x + player.width < -150 ||
+        player.x > elements.canvas.width + 150) {
+        
+        if (player.stocks > 1) {
+            player.stocks--;
+            updateStockDisplay(player, isPlayer1);
+            const spawnPoint = isPlayer1 ? layout.spawns.player1 : layout.spawns.player2;
+            resetPlayer(player, 
+                spawnPoint.x * elements.canvas.width,
+                spawnPoint.y * elements.canvas.height);
+        } else {
+            player.stocks = 0;
+            updateStockDisplay(player, isPlayer1);
+            gameOver = true;
+            toggleRestartButton(true);
+        }
     }
 }
 
@@ -194,10 +239,9 @@ function updateGame() {
     // Move players
     movePlayer(player1, 'a', 'd');
     movePlayer(player2, 'ArrowLeft', 'ArrowRight');
-    
-    // Apply gravity
-    applyGravity(player1, platform);
-    applyGravity(player2, platform);
+      // Apply gravity
+    applyGravity(player1, platforms);
+    applyGravity(player2, platforms);
     
     // Update animations
     updatePlayerAnimation(player1);
@@ -206,10 +250,9 @@ function updateGame() {
     // Apply friction
     player1.dx *= 0.95;
     player2.dx *= 0.95;
-    
-    // Check boundaries
-    checkFallOff(player1, platform.x + platform.width/7);
-    checkFallOff(player2, platform.x + platform.width - 100);
+      // Check boundaries
+    checkFallOff(player1, true);
+    checkFallOff(player2, false);
     
     // Handle combat
     handlePunching(player1, player2, 'r');
@@ -229,10 +272,17 @@ function updateGame() {
  * Render game
  */
 function render() {
-    ctx.clearRect(0, 0, elements.canvas.width, elements.canvas.height);
+    const ctx = getContext();
+    if (!ctx) return;
     
+    ctx.clearRect(0, 0, elements.canvas.width, elements.canvas.height);
     drawBackground(ctx);
-    drawPlatform(ctx, platform);
+    
+    // Draw platforms if they exist
+    if (platforms && platforms.length > 0) {
+        drawPlatforms(ctx, platforms);
+    }
+    
     drawPlayer(ctx, player1, player1, player2);
     drawPlayer(ctx, player2, player1, player2);
     drawPunch(ctx, player1, '#FF0000');
