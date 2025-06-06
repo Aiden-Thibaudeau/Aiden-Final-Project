@@ -10,22 +10,19 @@ export function createPlayer(x, y) {
         y,
         width: 50,
         height: 50,
-        speed: PLAYER_SPEED,
-        jumpStrength: 20,
-        maxJumps: MAX_JUMPS,
         dx: 0,
         dy: 0,
+        speed: PLAYER_SPEED,
         jumping: false,
         grounded: false,
         jumpsLeft: MAX_JUMPS,
         punching: false,
-        punchTimer: 0,
         punchCooldown: 0,
+        projectileCooldown: 0,
         facing: 1,
         knockbackDx: 0,
-        stocks: 3,
-        projectileCooldown: 0,
         knockbackMultiplier: 1,
+        stocks: 3, // Initialize with 3 stocks
         charging: false,
         chargeTime: 0,
         chargeMultiplier: 1,
@@ -35,13 +32,7 @@ export function createPlayer(x, y) {
         animationFrame: 0,
         squishFactor: 1,
         stretchFactor: 1,
-        color: null,
-        // Stats modifiers
-        punchPower: 1.0,
-        punchSpeed: 1.0,
-        projectileSpeed: 1.0,
-        projectilePower: 1.0,
-        weight: 1.0
+        floatOffset: 0
     };
     console.log('Created player at x:', x, 'y:', y);
     return player;

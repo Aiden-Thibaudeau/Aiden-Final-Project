@@ -81,43 +81,55 @@ const player2 = createPlayer(
     initialLayout.spawns.player2.y * elements.canvas.height
 );
 
-// Initialize stock display
-updateStockDisplay(player1, true);
-updateStockDisplay(player2, false);
-updatePercentDisplay(player1, true);
-updatePercentDisplay(player2, false);
-
 /**
  * Initialize game
  */
 function initGame() {
-    // Initialize UI
-    initializeUI();
+    console.log('Initializing game...');
     
-    // Initialize controls
-    initializeControls(player1, player2);
-    
-    // Set up start game handler
-    elements.startGameBtn.addEventListener('click', startGame);
-    
-    // Set up restart handler
-    elements.restartBtn.addEventListener('click', restartGame);
-    
-    // Load images
-    loadImages();
+    try {
+        // Initialize UI first
+        initializeUI();
+        
+        // Initialize controls
+        initializeControls(player1, player2);
+        
+        // Set up start game handler
+        elements.startGameBtn.addEventListener('click', () => {
+            console.log('Start game clicked');
+            if (document.readyState === 'complete') {
+                startGame();
+            } else {
+                console.warn('Document not fully loaded, waiting...');
+            }
+        });
+        
+        // Set up restart handler
+        elements.restartBtn.addEventListener('click', restartGame);
+        
+        // Load images
+        loadImages();
+        
+        console.log('Game initialization complete');
+    } catch (error) {
+        console.error('Error during game initialization:', error);
+    }
 }
 
 /**
  * Start new game
  */
 function startGame() {
-    console.log('Game started!');
-    gameStarted = true;
-    gameOver = false;
+    console.log('Starting game...');
     
     // Create platforms for selected stage
     platforms = createPlatforms(selectedStage);
     console.log('Created platforms for stage:', selectedStage, platforms);
+    
+    // Reset game state
+    gameStarted = true;
+    gameOver = false;
+    projectiles.length = 0;
     
     // Reset stocks and positions
     player1.stocks = 3;
@@ -163,16 +175,23 @@ function startGame() {
 function restartGame() {
     console.log('Game restarted!');
     gameOver = false;
+    gameStarted = true;
     toggleRestartButton(false);
     
-    // Reset stocks
+    // Create platforms for selected stage
+    platforms = createPlatforms(selectedStage);
+    
+    // Reset stocks and clear any existing state
     player1.stocks = 3;
     player2.stocks = 3;
+    player1.knockbackMultiplier = 1;
+    player2.knockbackMultiplier = 1;
     
     // Reapply color stats before resetting players
     applyColorStats(player1, player1.color);
     applyColorStats(player2, player2.color);
-      // Reset players to their spawn positions
+    
+    // Reset players to their spawn positions using stage layout
     const respawnLayout = stageLayouts[selectedStage];
     resetPlayer(player1, 
         respawnLayout.spawns.player1.x * elements.canvas.width,
@@ -181,10 +200,20 @@ function restartGame() {
         respawnLayout.spawns.player2.x * elements.canvas.width,
         respawnLayout.spawns.player2.y * elements.canvas.height);
     
-    // Reset keys
+    // Clear any active projectiles
+    projectiles.length = 0;
+    
+    // Update UI displays
+    updateStockDisplay(player1, true);
+    updateStockDisplay(player2, false);
+    updatePercentDisplay(player1, true);
+    updatePercentDisplay(player2, false);
+    
+    // Reset input states
     resetKeyStates();
     
-    // Start game loop
+    // Restart game loop
+    lastFrameTime = performance.now();
     requestAnimationFrame(gameLoop);
 }
 
@@ -199,14 +228,20 @@ function checkFallOff(player, isPlayer1) {
     if (player.y > elements.canvas.height + playerRenderHeight ||
         player.x + player.width < -150 ||
         player.x > elements.canvas.width + 150) {
-        
-        if (player.stocks > 1) {
+          if (player.stocks > 1) {
+            // Decrement stocks and update UI before resetting position
             player.stocks--;
             updateStockDisplay(player, isPlayer1);
+            
+            // Reset player to spawn point
             const spawnPoint = isPlayer1 ? layout.spawns.player1 : layout.spawns.player2;
             resetPlayer(player, 
                 spawnPoint.x * elements.canvas.width,
                 spawnPoint.y * elements.canvas.height);
+            
+            // Reset knockback multiplier on respawn
+            player.knockbackMultiplier = 1;
+            updatePercentDisplay(player, isPlayer1);
         } else {
             player.stocks = 0;
             updateStockDisplay(player, isPlayer1);
@@ -220,15 +255,30 @@ function checkFallOff(player, isPlayer1) {
  * Handle player loss
  */
 function handlePlayerLoss(player, spawnX) {
+    const isPlayer1 = player === player1;
+    
     if (player.stocks > 1) {
+        // Decrement stocks and update UI
         player.stocks--;
-        updateStockDisplay(player, player === player1);
-        resetPlayer(player, spawnX, platform.y);
+        updateStockDisplay(player, isPlayer1);
+        
+        // Reset player position and stats
+        const respawnLayout = stageLayouts[selectedStage];
+        const spawnPoint = isPlayer1 ? respawnLayout.spawns.player1 : respawnLayout.spawns.player2;
+        resetPlayer(player, 
+            spawnPoint.x * elements.canvas.width,
+            spawnPoint.y * elements.canvas.height);
+        
+        // Reset knockback multiplier and update percentage display
+        player.knockbackMultiplier = 1;
+        updatePercentDisplay(player, isPlayer1);
     } else {
+        // Game over state
         player.stocks = 0;
-        updateStockDisplay(player, player === player1);
+        updateStockDisplay(player, isPlayer1);
         gameOver = true;
         toggleRestartButton(true);
+        console.log('Game over! Winner:', isPlayer1 ? 'Player 2' : 'Player 1');
     }
 }
 
@@ -300,36 +350,44 @@ function render() {
  * Game loop with timing control
  */
 function gameLoop(timestamp) {
-    if (!gameStarted) return;
-    
-    // Calculate time since last frame
-    const deltaTime = timestamp - lastFrameTime;
-    
-    // Skip frame if too soon
-    if (deltaTime < FRAME_TIME) {
+    if (!gameStarted || !timestamp) {
         requestAnimationFrame(gameLoop);
         return;
     }
     
-    // FPS calculation
-    frameCounter++;
-    if (timestamp - lastFpsUpdate >= 1000) {
-        currentFps = frameCounter;
-        frameCounter = 0;
-        lastFpsUpdate = timestamp;
-        console.log('FPS:', currentFps);
-    }
-    
-    lastFrameTime = timestamp;
-    
-    if (!gameOver) {
-        updateGame();
-    }
-    
-    render();
-    
-    if (!gameOver) {
-        requestAnimationFrame(gameLoop);
+    try {
+        // Calculate time since last frame
+        const deltaTime = timestamp - lastFrameTime;
+        
+        // Skip frame if too soon
+        if (deltaTime < FRAME_TIME) {
+            requestAnimationFrame(gameLoop);
+            return;
+        }
+        
+        // FPS calculation
+        frameCounter++;
+        if (timestamp - lastFpsUpdate >= 1000) {
+            currentFps = frameCounter;
+            frameCounter = 0;
+            lastFpsUpdate = timestamp;
+            console.log('FPS:', currentFps);
+        }
+        
+        lastFrameTime = timestamp;
+        
+        if (!gameOver) {
+            updateGame();
+        }
+        
+        render();
+        
+        if (!gameOver) {
+            requestAnimationFrame(gameLoop);
+        }
+    } catch (error) {
+        console.error('Error in game loop:', error);
+        gameOver = true;
     }
 }
 
