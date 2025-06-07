@@ -27,8 +27,11 @@ canvas {
 }
 
 .stock-container {
+  position: absolute;
   display: flex;
   gap: 5px;
+  padding: 10px;
+  z-index: 1000;
   position: absolute;
   top: 20px;
   height: 30px;
@@ -487,11 +490,53 @@ canvas {
 }
 
 /* Game UI elements */
+#gameUI {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 10;
+    font-family: 'Arial', sans-serif;
+}
+
+#player1UI, #player2UI {
+    position: fixed;
+    top: 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    z-index: 100;
+    background: rgba(0, 0, 0, 0.5);
+    padding: 10px 15px;
+    border-radius: 10px;
+    backdrop-filter: blur(4px);
+}
+
+#player1UI {
+    left: 20px;
+}
+
+#player2UI {
+    right: 20px;
+}
+
+#player1Percent, #player2Percent {
+    font-size: 24px;
+    font-weight: bold;
+    color: white;
+    text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+    margin-top: 5px;
+}
+
+.stock-container {
+    display: none;
+}
+
 .stock-heart {
-    width: 25px;
-    height: 25px;
-    margin: 0 2px;
-    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
+    filter: none;
+    image-rendering: auto;
 }
 
 /* Responsive design */

@@ -213,20 +213,38 @@ function playSelectionSound() {
     // audio.play().catch(() => {}); // Ignore errors if audio fails
 }
 
+// Cache for heart image
+const heartImage = new Image();
+heartImage.src = 'assets/hearts.png';
+
 /**
  * Update the stock (lives) display for a player
  */
 export function updateStockDisplay(player, isPlayer1) {
-    const containerId = isPlayer1 ? 'player1Stock' : 'player2Stock';
-    const stockContainer = document.getElementById(containerId);
+    if (!player || typeof player.stocks !== 'number') {
+        console.error('Invalid player object passed to updateStockDisplay');
+        return;
+    }
 
-    stockContainer.innerHTML = '';
-    for (let i = 0; i < player.stocks; i++) {
-        const heart = document.createElement('img');
-        heart.src = 'assets/hearts.png';
-        heart.alt = 'Heart';
-        heart.className = 'stock-heart';
-        stockContainer.appendChild(heart);
+    const canvas = elements.canvas;
+    const ctx = canvas.getContext('2d');
+
+    if (!ctx) {
+        console.error('Canvas context not available');
+        return;
+    }
+
+    const stocksToShow = Math.max(0, Math.min(player.stocks, 3));
+    const startX = isPlayer1 ? 20 : canvas.width - 20 - stocksToShow * 30;
+    const startY = 20;
+
+    // Only draw hearts if the image is loaded
+    if (heartImage.complete) {
+        for (let i = 0; i < stocksToShow; i++) {
+            const x = startX + i * 30;
+            const y = startY;
+            ctx.drawImage(heartImage, x - 15, y - 15, 30, 30);
+        }
     }
 }
 
@@ -234,10 +252,33 @@ export function updateStockDisplay(player, isPlayer1) {
  * Update the damage percentage display for a player
  */
 export function updatePercentDisplay(player, isPlayer1) {
-    const percentId = isPlayer1 ? 'player1Percent' : 'player2Percent';
-    const percentContainer = document.getElementById(percentId);
+    const canvas = elements.canvas;
+    const ctx = canvas.getContext('2d');
 
-    percentContainer.textContent = `${Math.round((player.knockbackMultiplier - 1) * 10)}%`;
+    if (!ctx) {
+        console.error('Canvas context not available');
+        return;
+    }
+
+    const percent = Math.round((player.knockbackMultiplier - 1) * 10);
+    const text = `${percent}%`;
+    
+    // Position text under the hearts
+    const heartsWidth = Math.min(player.stocks, 3) * 30;
+    const startX = isPlayer1 ? 20 : canvas.width - 20 - heartsWidth;
+    const y = 50; // Position below hearts
+    
+    // Set up text style with clear background
+    ctx.save();
+    ctx.font = '20px Arial';
+    ctx.fillStyle = 'white';
+    ctx.textAlign = isPlayer1 ? 'left' : 'right';
+    ctx.textBaseline = 'top';
+    
+    // Draw text
+    const x = isPlayer1 ? startX : startX + heartsWidth;
+    ctx.fillText(text, x, y);
+    ctx.restore();
 }
 
 /**
