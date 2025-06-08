@@ -3,17 +3,26 @@ import { characterStats, stageLayouts } from './constants.js';
 /**
  * DOM elements
  */
+const getElementById = (id) => {
+    const element = document.getElementById(id);
+    if (!element) {
+        console.error(`Element with id "${id}" not found`);
+    }
+    return element;
+};
+
 export const elements = {
-    canvas: document.getElementById('gameCanvas'),
-    characterSelectScreen: document.getElementById('characterSelectScreen'),
-    player1ColorOptions: document.getElementById('player1ColorOptions'),
-    player2ColorOptions: document.getElementById('player2ColorOptions'),
-    player1Preview: document.getElementById('player1Preview'),
-    player2Preview: document.getElementById('player2Preview'),
-    startGameBtn: document.getElementById('startGameBtn'),
-    restartBtn: document.getElementById('restartBtn'),
-    gameUI: document.getElementById('gameUI'),
-    stageOptions: document.querySelectorAll('.stage-option')
+    canvas: getElementById('gameCanvas'),
+    characterSelectScreen: getElementById('characterSelectScreen'),
+    player1ColorOptions: getElementById('player1ColorOptions'),
+    player2ColorOptions: getElementById('player2ColorOptions'),
+    player1Preview: getElementById('player1Preview'),
+    player2Preview: getElementById('player2Preview'),
+    startGameBtn: getElementById('startGameBtn'),
+    gameUI: getElementById('gameUI'),
+    stageOptions: document.querySelectorAll('.stage-option'),
+    opponentTypeToggle: getElementById('opponentTypeToggle'),
+    player2Title: getElementById('player2Title')
 };
 
 // Player colors and their corresponding image names
@@ -29,6 +38,7 @@ const colorToImageMap = {
 export let player1SelectedColor = '#FF6347';
 export let player2SelectedColor = '#4682B4';
 export let selectedStage = 'classic';
+export let isBot = false;
 
 /**
  * Set up color selection for a player
@@ -111,13 +121,13 @@ function updatePreview(color, playerNumber) {
     // Create preview image
     const previewImg = document.createElement('img');
     previewImg.src = `assets/player${playerNumber}${imageName}.png`;
-    previewImg.alt = `Player ${playerNumber} Preview`;
+    previewImg.alt = `${playerNumber === 2 && isBot ? 'Bot' : `Player ${playerNumber}`} Preview`;
     previewImg.className = 'preview-image';
     
     // Create character title
     const title = document.createElement('div');
     title.className = 'preview-title';
-    title.textContent = `Player ${playerNumber}`;
+    title.textContent = playerNumber === 2 && isBot ? 'Bot' : `Player ${playerNumber}`;
     
     // Create character name
     const name = document.createElement('div');
@@ -169,7 +179,7 @@ function updateStatsDisplay(color, playerNumber) {
         <div class="stat-row">
             <span class="stat-label">Projectile Power:</span>
             <div class="stat-bar">
-                ${getStatBar(stats.projectilePower, 0.7, 1.5)}
+                ${getStatBar(stats.projectilePower, 0.7, 1.7)}
                 <span class="stat-value">${stats.projectilePower.toFixed(1)}</span>
             </div>
         </div>
@@ -238,12 +248,19 @@ export function updateStockDisplay(player, isPlayer1) {
     const startX = isPlayer1 ? 20 : canvas.width - 20 - stocksToShow * 30;
     const startY = 20;
 
+    // Draw label
+    ctx.fillStyle = '#FFFFFF';
+    ctx.font = '16px Arial';
+    ctx.textAlign = isPlayer1 ? 'left' : 'right';
+    const label = isPlayer1 ? 'P1' : (isBot ? 'Bot' : 'P2');
+    ctx.fillText(label, startX + (isPlayer1 ? -10 : 10), startY - 5);
+
     // Only draw hearts if the image is loaded
     if (heartImage.complete) {
         for (let i = 0; i < stocksToShow; i++) {
-            const x = startX + i * 30;
+            const x = isPlayer1 ? startX + i * 30 : startX + i * 30;
             const y = startY;
-            ctx.drawImage(heartImage, x - 15, y - 15, 30, 30);
+            ctx.drawImage(heartImage, x, y, 30, 30);
         }
     }
 }
@@ -252,50 +269,56 @@ export function updateStockDisplay(player, isPlayer1) {
  * Update the damage percentage display for a player
  */
 export function updatePercentDisplay(player, isPlayer1) {
-    const canvas = elements.canvas;
-    const ctx = canvas.getContext('2d');
+    if (!player) return;
 
-    if (!ctx) {
-        console.error('Canvas context not available');
-        return;
-    }
+    const percentElement = document.getElementById(isPlayer1 ? 'player1Percent' : 'player2Percent');
+    if (!percentElement) return;
 
-    const percent = Math.round((player.knockbackMultiplier - 1) * 10);
-    const text = `${percent}%`;
-    
-    // Position text under the hearts
-    const heartsWidth = Math.min(player.stocks, 3) * 30;
-    const startX = isPlayer1 ? 20 : canvas.width - 20 - heartsWidth;
-    const y = 50; // Position below hearts
-    
-    // Set up text style with clear background
-    ctx.save();
-    ctx.font = '20px Arial';
-    ctx.fillStyle = 'white';
-    ctx.textAlign = isPlayer1 ? 'left' : 'right';
-    ctx.textBaseline = 'top';
-    
-    // Draw text
-    const x = isPlayer1 ? startX : startX + heartsWidth;
-    ctx.fillText(text, x, y);
-    ctx.restore();
+    const playerText = isPlayer1 ? 'P1' : (isBot ? 'Bot' : 'P2');
+    const percentage = Math.round((player.knockbackMultiplier - 1) * 100);
+    percentElement.textContent = `${playerText}: ${percentage}%`;
 }
 
 /**
  * Initialize the UI
  */
 export function initializeUI() {
-    setupColorSelection(elements.player1ColorOptions, elements.player1Preview, 1);
-    setupColorSelection(elements.player2ColorOptions, elements.player2Preview, 2);
-    setupStageSelection();
+    // Check that required elements exist
+    if (!elements.canvas || !elements.characterSelectScreen || !elements.gameUI) {
+        console.error('Required UI elements not found');
+        return;
+    }
 
+    // Set up color selection if elements exist
+    if (elements.player1ColorOptions && elements.player1Preview) {
+        setupColorSelection(elements.player1ColorOptions, elements.player1Preview, 1);
+    }
+    if (elements.player2ColorOptions && elements.player2Preview) {
+        setupColorSelection(elements.player2ColorOptions, elements.player2Preview, 2);
+    }
+
+    // Set up opponent type toggle
+    if (elements.opponentTypeToggle) {
+        elements.opponentTypeToggle.addEventListener('change', (e) => {
+            isBot = e.target.checked;
+            if (elements.player2Title) {
+                elements.player2Title.textContent = isBot ? 'Bot' : 'Player 2';
+            }
+        });
+    }
+
+    // Set up stage selection
+    if (elements.stageOptions.length > 0) {
+        setupStageSelection();
+    }
+
+    // Set canvas size
     elements.canvas.width = window.innerWidth;
     elements.canvas.height = window.innerHeight;
     
     // Initially hide game UI and show character select
     elements.characterSelectScreen.style.display = 'flex';
     elements.gameUI.style.display = 'none';
-    elements.restartBtn.style.display = 'none';
     
     // Add background animation
     animateBackground();
@@ -486,13 +509,8 @@ function drawStagePreview(canvas, stageName) {
 export function showGameUI() {
     elements.characterSelectScreen.style.display = 'none';
     elements.gameUI.style.display = 'block';
-}
-
-/**
- * Show/hide restart button
- */
-export function toggleRestartButton(show) {
-    elements.restartBtn.style.display = show ? 'block' : 'none';
+    elements.gameUI.style.zIndex = '1000'; // Ensure UI is above canvas
+    elements.canvas.style.zIndex = '0';    // Keep canvas behind UI
 }
 
 /**

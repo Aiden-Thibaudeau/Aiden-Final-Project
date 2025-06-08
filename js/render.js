@@ -1,5 +1,7 @@
 import { backgroundImage, getPlayerImage } from './assets.js';
 import { MAX_CHARGE_TIME, MAX_CHARGE_MULTIPLIER } from './constants.js';
+import { setRestartButtonBounds } from './input.js';
+import { isBot } from './ui.js';
 
 /**
  * Draw the game background
@@ -222,17 +224,51 @@ export function drawProjectileCharging(ctx, player) {
  * Draw game over screen
  */
 export function drawWinnerText(ctx, player1) {
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+    // Semi-transparent overlay
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
     ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
-
-    ctx.fillStyle = player1.stocks <= 0 ? '#4682B4' : '#FF6347';
-    ctx.font = '60px Arial';
+    
+    // Winner text with glow effect
     ctx.textAlign = 'center';
-    ctx.fillText(
-        `${player1.stocks <= 0 ? 'Player 2' : 'Player 1'} Wins!`,
-        ctx.canvas.width / 2,
-        ctx.canvas.height / 2 - 60
-    );
+    ctx.fillStyle = '#FFFFFF';
+    ctx.font = 'bold 48px Arial';
+    ctx.shadowColor = '#4ecdc4';
+    ctx.shadowBlur = 20;
+    
+    const winner = player1.stocks > 0 ? 'Player 1' : (isBot ? 'Bot' : 'Player 2');
+    ctx.fillText(`${winner} Wins!`, ctx.canvas.width / 2, ctx.canvas.height / 3);
+    ctx.shadowBlur = 0;
+    
+    // Draw restart button
+    const buttonWidth = 200;
+    const buttonHeight = 50;
+    const buttonX = (ctx.canvas.width - buttonWidth) / 2;
+    const buttonY = ctx.canvas.height / 2;
+    
+    // Button background with gradient
+    const gradient = ctx.createLinearGradient(buttonX, buttonY, buttonX, buttonY + buttonHeight);
+    gradient.addColorStop(0, '#4A4A8A');
+    gradient.addColorStop(1, '#2E2E5E');
+    
+    ctx.fillStyle = gradient;
+    ctx.strokeStyle = '#8470FF';
+    ctx.lineWidth = 2;
+    
+    // Draw button with rounded corners
+    ctx.beginPath();
+    ctx.roundRect(buttonX, buttonY, buttonWidth, buttonHeight, 10);
+    ctx.fill();
+    ctx.stroke();
+    
+    // Button text
+    ctx.fillStyle = '#FFFFFF';
+    ctx.font = '24px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText('Restart Game', ctx.canvas.width / 2, buttonY + buttonHeight/2 + 8);
+
+    // Store button coordinates for click detection
+    const bounds = { buttonX, buttonY, buttonWidth, buttonHeight };
+    setRestartButtonBounds(bounds);
 }
 
 function drawChargeBar(ctx, player, x, y, progress, width = 60, height = 8) {

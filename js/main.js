@@ -11,7 +11,7 @@ import {
     applyGravity, 
     updatePlayerAnimation, 
     resetPlayer,
-    applyColorStats  // Add this import
+    applyColorStats
 } from './player.js';
 import { 
     drawBackground,
@@ -31,11 +31,13 @@ import {
     selectedStage,
     initializeUI,
     showGameUI,
-    toggleRestartButton,
     updateStockDisplay,
-    updatePercentDisplay
+    updatePercentDisplay,
+    isBot
 } from './ui.js';
 import { initializeControls, resetKeyStates } from './input.js';
+import { setRestartButtonBounds } from './input.js';
+import { updateBot } from './AI.js';
 
 let gameOver = false;
 let gameStarted = false;
@@ -98,10 +100,11 @@ function initGame() {
     initializeControls(player1, player2);
     
     // Set up start game handler
-    elements.startGameBtn.addEventListener('click', startGame);
-    
-    // Set up restart handler
-    elements.restartBtn.addEventListener('click', restartGame);
+    if (elements.startGameBtn) {
+        elements.startGameBtn.addEventListener('click', startGame);
+    } else {
+        console.error('Start game button not found');
+    }
     
     // Load images
     loadImages();
@@ -139,15 +142,7 @@ function startGame() {
     player2.color = player2SelectedColor;
     applyColorStats(player1, player1SelectedColor);
     applyColorStats(player2, player2SelectedColor);
-      // Reset players to their spawn positions
-    const spawnLayout = stageLayouts[selectedStage];
-    resetPlayer(player1, 
-        spawnLayout.spawns.player1.x * elements.canvas.width,
-        spawnLayout.spawns.player1.y * elements.canvas.height);
-    resetPlayer(player2,
-        spawnLayout.spawns.player2.x * elements.canvas.width,
-        spawnLayout.spawns.player2.y * elements.canvas.height);
-    
+
     // Show game UI and update displays
     showGameUI();
     
@@ -164,32 +159,28 @@ function startGame() {
 /**
  * Restart game
  */
-function restartGame() {
-    console.log('Game restarted!');
+export function restartGame() {
+    // Reset game state
     gameOver = false;
-    toggleRestartButton(false);
+    gameStarted = false;
     
-    // Reset stocks
+    // Hide game UI and restart button
+    elements.gameUI.style.display = 'none';
+    
+    // Show character select screen
+    elements.characterSelectScreen.style.display = 'flex';
+    
+    // Reset player states
     player1.stocks = 3;
     player2.stocks = 3;
+    player1.knockbackMultiplier = 1;
+    player2.knockbackMultiplier = 1;
     
-    // Reapply color stats before resetting players
-    applyColorStats(player1, player1.color);
-    applyColorStats(player2, player2.color);
-      // Reset players to their spawn positions
-    const respawnLayout = stageLayouts[selectedStage];
-    resetPlayer(player1, 
-        respawnLayout.spawns.player1.x * elements.canvas.width,
-        respawnLayout.spawns.player1.y * elements.canvas.height);
-    resetPlayer(player2,
-        respawnLayout.spawns.player2.x * elements.canvas.width,
-        respawnLayout.spawns.player2.y * elements.canvas.height);
+    // Clear any existing projectiles
+    projectiles.length = 0;
     
-    // Reset keys
+    // Reset key states
     resetKeyStates();
-    
-    // Start game loop
-    requestAnimationFrame(gameLoop);
 }
 
 /**
@@ -214,8 +205,7 @@ function checkFallOff(player, isPlayer1) {
         } else {
             player.stocks = 0;
             updateStockDisplay(player, isPlayer1);
-            gameOver = true;
-            toggleRestartButton(true);
+            gameOver = true;  // Simply set the gameOver flag
         }
     }
 }
@@ -224,16 +214,33 @@ function checkFallOff(player, isPlayer1) {
  * Handle player loss
  */
 function handlePlayerLoss(player, spawnX) {
-    if (player.stocks > 1) {
-        player.stocks--;
-        updateStockDisplay(player, player === player1);
-        resetPlayer(player, spawnX, platform.y);
+    player.stocks--;
+    
+    if (player.stocks <= 0) {
+        handleGameOver();
     } else {
-        player.stocks = 0;
-        updateStockDisplay(player, player === player1);
-        gameOver = true;
-        toggleRestartButton(true);
+        resetPlayer(player, spawnX, elements.canvas.height * 0.3);
     }
+    
+    // Update stock display
+    updateStockDisplay(player, player === player1);
+}
+
+/**
+ * Handle game over
+ */
+function handleGameOver() {
+    gameOver = true;
+    gameStarted = false;
+    
+    // Ensure the gameUI is visible
+    elements.gameUI.style.display = 'block';
+    
+    // Show the restart button
+    elements.restartBtn.style.display = 'block';
+    
+    // Stop any ongoing game processes
+    cancelAnimationFrame(gameLoop);
 }
 
 /**
@@ -242,8 +249,14 @@ function handlePlayerLoss(player, spawnX) {
 function updateGame() {
     // Move players
     movePlayer(player1, 'a', 'd');
-    movePlayer(player2, 'ArrowLeft', 'ArrowRight');
-      // Apply gravity
+    if (!isBot) {
+        movePlayer(player2, 'ArrowLeft', 'ArrowRight');
+    } else {
+        updateBot(player2, player1, platforms);
+        movePlayer(player2, 'ArrowLeft', 'ArrowRight'); // Apply bot's movement choices
+    }
+
+    // Apply gravity
     applyGravity(player1, platforms);
     applyGravity(player2, platforms);
     
@@ -254,16 +267,18 @@ function updateGame() {
     // Apply friction
     player1.dx *= 0.95;
     player2.dx *= 0.95;
-      // Check boundaries
+    
+    // Check boundaries
     checkFallOff(player1, true);
     checkFallOff(player2, false);
     
     // Handle combat
     handlePunching(player1, player2, 'r');
-    handlePunching(player2, player1, 'k');
+    handlePunching(player2, player1, 'k'); // Let bot punch if it chose to
     
+    // Handle projectiles
     shootProjectile(player1, 't');
-    shootProjectile(player2, 'l');
+    shootProjectile(player2, 'l'); // Let bot shoot if it chose to
     
     updateProjectiles(player1, player2);
     
@@ -304,6 +319,9 @@ function render() {
     
     if (gameOver) {
         drawWinnerText(ctx, player1);
+        requestAnimationFrame(render); // Keep rendering the final state
+    } else if (gameStarted) {
+        requestAnimationFrame(gameLoop);
     }
 }
 
@@ -311,6 +329,12 @@ function render() {
  * Game loop with timing control
  */
 function gameLoop(timestamp) {
+    // If game is over, just render the final state
+    if (gameOver) {
+        render();
+        return;
+    }
+
     if (!gameStarted) return;
     
     // Calculate time since last frame
@@ -328,21 +352,24 @@ function gameLoop(timestamp) {
         currentFps = frameCounter;
         frameCounter = 0;
         lastFpsUpdate = timestamp;
-        console.log('FPS:', currentFps);
     }
     
+    // Update game state
+    updateGame();
+    
+    // Store timing
     lastFrameTime = timestamp;
     
+    // Continue game loop
     if (!gameOver) {
-        updateGame();
-    }
-    
-    render();
-    
-    if (!gameOver) {
+        render();
         requestAnimationFrame(gameLoop);
     }
 }
 
 // Initialize game when loaded
-window.addEventListener('load', initGame);
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initGame);
+} else {
+    initGame();
+}

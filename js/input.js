@@ -12,15 +12,28 @@ export const keys = {
     'l': false
 };
 
+import { restartGame } from './main.js';
+import { isBot } from './ui.js';
+
+// Track restart button coordinates
+let restartButtonBounds = null;
+
+// List of Player 2's keys
+const player2Keys = ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'k', 'l'];
+
 /**
  * Initialize keyboard event listeners
  */
 export function initializeControls(player1, player2) {
     window.addEventListener('keydown', (e) => {
         if (e.key in keys) {
-            keys[e.key] = true;
+            // Only allow player 2 keys if not in bot mode
+            if (!isBot || !player2Keys.includes(e.key)) {
+                keys[e.key] = true;
+            }
         }
 
+        // Handle Player 1 jumping
         if (e.key === 'w' && player1.jumpsLeft > 0) {
             player1.dy = -player1.jumpStrength;
             player1.jumping = true;
@@ -29,7 +42,9 @@ export function initializeControls(player1, player2) {
             player1.stretchFactor = 1.3;
             console.log('Player 1 jumped with strength:', player1.jumpStrength);
         }
-        if (e.key === 'ArrowUp' && player2.jumpsLeft > 0) {
+        
+        // Only allow player 2 jumping if not in bot mode
+        if (e.key === 'ArrowUp' && !isBot && player2.jumpsLeft > 0) {
             player2.dy = -player2.jumpStrength;
             player2.jumping = true;
             player2.grounded = false;
@@ -41,7 +56,21 @@ export function initializeControls(player1, player2) {
 
     window.addEventListener('keyup', (e) => {
         if (e.key in keys) {
-            keys[e.key] = false;
+            // Only allow player 2 keys if not in bot mode
+            if (!isBot || !player2Keys.includes(e.key)) {
+                keys[e.key] = false;
+            }
+        }
+    });
+
+    // Add canvas click handler for restart button
+    document.getElementById('gameCanvas').addEventListener('click', (e) => {
+        const rect = e.target.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+        
+        if (isInsideButton(x, y)) {
+            restartGame();
         }
     });
 }
@@ -50,7 +79,25 @@ export function initializeControls(player1, player2) {
  * Reset all key states to false
  */
 export function resetKeyStates() {
-    Object.keys(keys).forEach(key => {
-        keys[key] = false;
-    });
+    for (let key in keys) {
+        // When resetting, respect bot mode for Player 2 controls
+        if (!isBot || !player2Keys.includes(key)) {
+            keys[key] = false;
+        }
+    }
+}
+
+// Check if a point is inside the restart button
+function isInsideButton(x, y) {
+    if (!restartButtonBounds) return false;
+    return (
+        x >= restartButtonBounds.buttonX &&
+        x <= restartButtonBounds.buttonX + restartButtonBounds.buttonWidth &&
+        y >= restartButtonBounds.buttonY &&
+        y <= restartButtonBounds.buttonY + restartButtonBounds.buttonHeight
+    );
+}
+
+export function setRestartButtonBounds(bounds) {
+    restartButtonBounds = bounds;
 }

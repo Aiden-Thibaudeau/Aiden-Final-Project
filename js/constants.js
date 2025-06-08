@@ -48,7 +48,7 @@ export const characterStats = {
         punchPower: 2,
         punchSpeed: 0.7,
         projectileSpeed: 0.8,
-        projectilePower: 1.5,
+        projectilePower: 1.4,
         weight: 1.4
     },
     '#32CD32': { // Green - Fast and agile
@@ -68,7 +68,7 @@ export const characterStats = {
         punchPower: 0.8,
         punchSpeed: 1.0,
         projectileSpeed: 1.4,
-        projectilePower: 1.4,
+        projectilePower: 1.7,
         weight: 0.9
     },
     '#8A2BE2': { // Purple - Technical fighter

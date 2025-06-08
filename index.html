@@ -19,15 +19,28 @@
           <div id="player1Preview" class="player-preview"></div>
         </div>
 
-      <div class="player-section">
-        <h3 class="player-title">Player 2</h3>
-        <div id="player2ColorOptions"></div>
-        <div id="player2Preview" class="player-preview"></div>
-      </div>    </div>
+        <div class="opponent-type-toggle">
+          <h3>Opponent Type</h3>
+          <div class="toggle-switch">
+            <input type="checkbox" id="opponentTypeToggle">
+            <label for="opponentTypeToggle" class="toggle-label">
+              <span class="toggle-option">Player 2</span>
+              <span class="toggle-slider"></span>
+              <span class="toggle-option">Bot</span>
+            </label>
+          </div>
+        </div>
 
-    <div class="stage-selection-container">
-      <h3 class="stage-select-title">Select Stage</h3>
-      <div class="stage-grid">        <div class="stage-option selected" data-stage="classic">
+        <div class="player-section">
+          <h3 class="player-title" id="player2Title">Player 2</h3>
+          <div id="player2ColorOptions"></div>
+          <div id="player2Preview" class="player-preview"></div>
+        </div>
+      </div>
+
+      <div class="stage-selection-container">
+        <h3 class="stage-select-title">Select Stage</h3>
+        <div class="stage-grid">        <div class="stage-option selected" data-stage="classic">
           <canvas class="stage-preview" width="150" height="100"></canvas>
           <div class="stage-name">Classic</div>
         </div>
@@ -54,12 +67,7 @@
     <div id="player2UI" style="position: absolute; top: 35px; right: 20px;">
       <div id="player2Stock" class="stock-container player2"></div>
       <div id="player2Percent" style="text-align: center; font-size: 20px; font-weight: bold; color: white; margin-top: 5px;"></div>
-    </div>
-    
-    <button id="restartBtn" style="position:absolute; top:50%; left:50%; transform:translate(-50%, -50%); display:none; font-size:24px; padding:10px 20px;">Restart</button>
-      <div id="player2Percent" style="text-align: center; font-size: 20px; font-weight: bold; color: white; margin-top: 5px;"></div>
-    </div>
-  </div>
+    </div>  </div>
     <script type="module" src="js/main.js"></script>
 </body>
 </html>
