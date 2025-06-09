@@ -245,15 +245,12 @@ export function updateStockDisplay(player, isPlayer1) {
     }
 
     const stocksToShow = Math.max(0, Math.min(player.stocks, 3));
-    const startX = isPlayer1 ? 20 : canvas.width - 20 - stocksToShow * 30;
-    const startY = 20;
-
-    // Draw label
+    const startX = isPlayer1 ? 20 : canvas.width - 20 - stocksToShow * 30;    const startY = 20;    // Draw damage percentage
     ctx.fillStyle = '#FFFFFF';
     ctx.font = '16px Arial';
     ctx.textAlign = isPlayer1 ? 'left' : 'right';
-    const label = isPlayer1 ? 'P1' : (isBot ? 'Bot' : 'P2');
-    ctx.fillText(label, startX + (isPlayer1 ? -10 : 10), startY - 5);
+    const percentage = Math.round((player.knockbackMultiplier / 5) * 100);
+    ctx.fillText(`${percentage}%`, startX + (isPlayer1 ? -10 : 10), startY - 5);
 
     // Only draw hearts if the image is loaded
     if (heartImage.complete) {
@@ -272,10 +269,8 @@ export function updatePercentDisplay(player, isPlayer1) {
     if (!player) return;
 
     const percentElement = document.getElementById(isPlayer1 ? 'player1Percent' : 'player2Percent');
-    if (!percentElement) return;
-
-    const playerText = isPlayer1 ? 'P1' : (isBot ? 'Bot' : 'P2');
-    const percentage = Math.round((player.knockbackMultiplier - 1) * 100);
+    if (!percentElement) return;    const playerText = isPlayer1 ? 'P1' : (isBot ? 'Bot' : 'P2');
+    const percentage = Math.round((player.knockbackMultiplier / 5) * 100);
     percentElement.textContent = `${playerText}: ${percentage}%`;
 }
 

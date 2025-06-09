@@ -112,7 +112,7 @@ function applyPunchEffect(attacker, defender) {
     
     defender.knockbackDx = knockDirection * (chargedKnockback * defender.knockbackMultiplier);
     defender.dy = -10 * Math.sqrt(attacker.chargeMultiplier * attacker.punchPower);
-    defender.knockbackMultiplier = Math.min(defender.knockbackMultiplier + chargeDamage, 11);
+    defender.knockbackMultiplier = Math.min(defender.knockbackMultiplier + chargeDamage, 15);
     defender.stretchFactor = 1.4;
     
     console.log('Punch hit! Defender knockbackMultiplier:', defender.knockbackMultiplier.toFixed(2));
@@ -211,7 +211,7 @@ function applyProjectileEffect(projectile, target) {
     
     target.knockbackDx = Math.sign(projectile.dx) * (chargedKnockback * target.knockbackMultiplier);
     target.dy = -8 * Math.sqrt((projectile.chargeMultiplier || 1) * owner.projectilePower);
-    target.knockbackMultiplier = Math.min(target.knockbackMultiplier + chargeDamage, 11);
+    target.knockbackMultiplier = Math.min(target.knockbackMultiplier + chargeDamage, 15);
     target.stretchFactor = 1.3;
 
     console.log('Projectile hit! Target knockbackMultiplier:', target.knockbackMultiplier.toFixed(2));
