@@ -1,188 +1,160 @@
+// Bot AI core logic
 import { keys } from './input.js';
-import { GameState, calculateUtility, generateActions } from './AIState.js';
+import { executeCloseCombat, executeRangedCombat, isInDanger, executeEvasion } from './enhanced-combat.js';
 
-// Bot memory for persistent behavior
-const botMemory = {
-    lastActionTime: 0,
-    consecutiveSameAction: 0,
-    lastAction: null,
-    firstJumpTime: 0,
-    lastX: 0,
-    stuckTimer: 0,
-    lastMovementTime: 0, // Track last movement time
-    lastMovingRight: undefined // Track last movement direction
+// Bot state tracking
+const botPlanner = {
+    isRecovering: false,
+    lastJumpTime: 0,
+    lastPlatformY: 0,
+    recoveryAttempts: 0,
+    lastGroundedTime: 0,
+    lastMoveDirection: null
 };
 
-const SAFE_ZONE = 40;      // Safe distance from edge
-const MIN_PLAYER_DIST = 120; // Minimum safe distance from player
-const MOVEMENT_COOLDOWN = 15; // Frames to wait between movement changes
+// Configuration
+const CONFIG = {
+    JUMP_COOLDOWN: 500,        // Min time between jumps (ms)
+    EDGE_BUFFER: 50,           // Stay away from platform edges
+    FALL_THRESHOLD: 100,       // Distance below platform to trigger recovery
+    MAX_RECOVERY_ATTEMPTS: 3,  // Max consecutive recovery attempts
+    GROUND_MEMORY: 1000,       // Remember last grounded time (ms)
+    OPTIMAL_DISTANCE: 150      // Preferred combat distance
+};
 
 /**
- * Updates bot behavior based on game state using a planner-based system
- * @param {Object} bot - The bot player object
- * @param {Object} player - The human player object
- * @param {Object} platforms - Array of platforms
+ * Main update function for bot AI
  */
 export function updateBot(bot, player, platforms) {
-    // Reset all bot-controlled keys
-    keys['ArrowLeft'] = keys['ArrowRight'] = keys['ArrowUp'] = keys['k'] = keys['l'] = false;
-
-    const mainPlatform = platforms[0];
-    const platformCenter = mainPlatform.x + mainPlatform.width / 2;
-    const distanceToPlayer = player.x - bot.x;
-    const absDistanceToPlayer = Math.abs(distanceToPlayer);
-    const tooCloseToPlayer = absDistanceToPlayer < MIN_PLAYER_DIST;
-
-    // Check if bot is stuck (oscillating near edge)
-    if (Math.abs(bot.x - botMemory.lastX) < 5) {
-        botMemory.stuckTimer++;
-    } else {
-        botMemory.stuckTimer = 0;
-    }
-    botMemory.lastX = bot.x;
-
-    // Critical recovery check - this takes precedence over everything
-    const isOffPlatform = (
-        bot.x < mainPlatform.x - 20 || // Left of platform with small buffer
-        bot.x > mainPlatform.x + mainPlatform.width + 20 || // Right of platform with small buffer
-        bot.y > mainPlatform.y // Below platform
-    );
-
-    if (isOffPlatform) {
-        const distanceToCenter = platformCenter - bot.x;
-        const distanceToTop = mainPlatform.y - bot.y;
-
-        // If stuck, force a jump to break the pattern
-        if (botMemory.stuckTimer > 30 && bot.jumpsLeft > 0) {
-            performJump(bot);
-            keys['ArrowUp'] = true;
-            botMemory.stuckTimer = 0;
-        }
-        // Always move toward platform center, even when near player
-        keys['ArrowRight'] = bot.x < platformCenter;
-        keys['ArrowLeft'] = bot.x > platformCenter;
-
-        // Smart jumping logic
-        if (bot.jumpsLeft > 0) {
-            // If we're below the platform and haven't jumped yet
-            if (bot.y > mainPlatform.y && bot.jumpsLeft === 2) {
-                performJump(bot);
-                keys['ArrowUp'] = true;
-                botMemory.firstJumpTime = Date.now();
-            } 
-            // Use second jump when falling and platform is above us
-            else if (bot.jumpsLeft === 1 && 
-                    Date.now() - botMemory.firstJumpTime > 200 &&
-                    bot.dy > 0 && // Only jump when we start falling
-                    distanceToTop < 0) {
-                performJump(bot);
-                keys['ArrowUp'] = true;
-            }
-        }
-        
-        return; // Skip all other AI logic when in critical recovery
-    }    // When on platform but too close to player, prioritize center movement
-    if (tooCloseToPlayer && !isOffPlatform) {
-        const distanceToCenter = platformCenter - bot.x;
-        const now = Date.now();
-        const timeSinceLastMovement = now - botMemory.lastMovementTime;
-        const wantsToMoveRight = bot.x < platformCenter;
-        
-        // Only change direction if enough time has passed
-        if (timeSinceLastMovement >= MOVEMENT_COOLDOWN || 
-            (wantsToMoveRight ? !botMemory.lastMovingRight : botMemory.lastMovingRight) ||
-            botMemory.lastMovingRight === undefined) {
-            
-            // Update movement direction
-            keys['ArrowRight'] = wantsToMoveRight;
-            keys['ArrowLeft'] = !wantsToMoveRight;
-            botMemory.lastMovingRight = wantsToMoveRight;
-            botMemory.lastMovementTime = now;
-        } else {
-            // Continue last movement direction
-            keys['ArrowRight'] = botMemory.lastMovingRight;
-            keys['ArrowLeft'] = !botMemory.lastMovingRight;
-        }
-        
-        // Jump if not at platform center to get over player
-        if (Math.abs(distanceToCenter) > 50 && bot.grounded && bot.jumpsLeft > 0) {
-            performJump(bot);
-            keys['ArrowUp'] = true;
-        }
+    // Reset keys
+    resetKeys();
+    
+    // Update state
+    updateBotState(bot, platforms);
+    
+    // Priority 1: Platform Recovery
+    if (needsRecovery(bot, platforms)) {
+        executeRecovery(bot, platforms);
         return;
     }
-
-    // Reset timers when back on platform
-    if (!isOffPlatform) {
-        botMemory.firstJumpTime = 0;
-        botMemory.stuckTimer = 0;
-    }
-
-    // Regular AI behavior continues here
-    const state = new GameState(bot, player, platforms);
-    const actions = generateActions(state);
-
-    // Calculate utility scores for each action
-    actions.forEach(action => {
-        action.score = calculateUtility(action, state);
-        
-        // Add variety by slightly penalizing repeated actions
-        if (action.name === botMemory.lastAction) {
-            action.score -= botMemory.consecutiveSameAction * 50;
-        }
-    });
-
-    // Sort actions by score and select the best one
-    actions.sort((a, b) => b.score - a.score);
-    const selectedAction = actions[0];
-
-    if (selectedAction) {
-        const now = Date.now();
-        const timeSinceLastMovement = now - botMemory.lastMovementTime;
-        
-        // Only execute if enough time has passed since last movement
-        if (timeSinceLastMovement >= MOVEMENT_COOLDOWN || selectedAction.name !== botMemory.lastAction) {
-            // Execute the selected action
-            selectedAction.execute(keys);
-            
-            // Update bot memory
-            if (selectedAction.name === botMemory.lastAction) {
-                botMemory.consecutiveSameAction++;
-            } else {
-                botMemory.consecutiveSameAction = 0;
-                botMemory.lastMovementTime = now; // Reset cooldown timer on action change
-            }
-            botMemory.lastAction = selectedAction.name;
-            botMemory.lastActionTime = now;
-        }
-    }
-}
-
-/**
- * Helper function to perform a jump
- */
-function performJump(bot) {
-    bot.dy = -bot.jumpStrength;
-    bot.jumping = true;
-    bot.grounded = false;
-    bot.jumpsLeft--;
-    bot.stretchFactor = 1.3;
-}
-
-/**
- * Checks if the bot is near a platform edge
- */
-function isNearPlatformEdge(bot, platforms) {
-    const EDGE_THRESHOLD = 60;
     
-    for (const platform of platforms) {
-        if (Math.abs(bot.y + bot.height * 2 - platform.y) < 20) {
-            const leftEdge = platform.x;
-            const rightEdge = platform.x + platform.width;
-            
-            return (Math.abs(bot.x - leftEdge) < EDGE_THRESHOLD || 
-                    Math.abs(bot.x - rightEdge) < EDGE_THRESHOLD);
-        }
+    // Priority 2: Combat
+    executeCombat(bot, player, platforms);
+}
+
+/**
+ * Reset input keys
+ */
+function resetKeys() {
+    keys.ArrowLeft = false;
+    keys.ArrowRight = false;
+    keys.ArrowUp = false;
+    keys.k = false;  // punch
+    keys.l = false;  // projectile
+}
+
+/**
+ * Update bot state tracking
+ */
+function updateBotState(bot, platforms) {
+    const currentTime = Date.now();
+    
+    // Track grounded state
+    if (bot.grounded) {
+        botPlanner.lastGroundedTime = currentTime;
+        botPlanner.lastPlatformY = bot.y;
+        botPlanner.recoveryAttempts = 0;
     }
+    
+    // Reset recovery state if successful
+    if (botPlanner.isRecovering && bot.grounded) {
+        botPlanner.isRecovering = false;
+    }
+}
+
+/**
+ * Check if bot needs platform recovery
+ */
+function needsRecovery(bot, platforms) {
+    const mainPlatform = platforms[0];
+    
+    // Already in recovery mode
+    if (botPlanner.isRecovering) return true;
+    
+    // Check if far below platform
+    if (bot.y > mainPlatform.y + CONFIG.FALL_THRESHOLD) {
+        return true;
+    }
+    
+    // Check if near platform edge
+    const botCenter = bot.x + bot.width / 2;
+    const platformLeft = mainPlatform.x + CONFIG.EDGE_BUFFER;
+    const platformRight = mainPlatform.x + mainPlatform.width - CONFIG.EDGE_BUFFER;
+    
+    if (botCenter < platformLeft || botCenter > platformRight) {
+        return true;
+    }
+    
     return false;
 }
+
+/**
+ * Execute platform recovery
+ */
+function executeRecovery(bot, platforms) {
+    const mainPlatform = platforms[0];
+    const currentTime = Date.now();
+    
+    // Start recovery mode
+    botPlanner.isRecovering = true;
+    
+    // Get back to platform center
+    const botCenter = bot.x + bot.width / 2;
+    const platformCenter = mainPlatform.x + mainPlatform.width / 2;
+    
+    // Move towards platform center
+    if (botCenter < platformCenter) {
+        keys.ArrowRight = true;
+        botPlanner.lastMoveDirection = 'right';
+    } else {
+        keys.ArrowLeft = true;
+        botPlanner.lastMoveDirection = 'left';
+    }
+    
+    // Jump if needed
+    if (bot.grounded && 
+        currentTime - botPlanner.lastJumpTime > CONFIG.JUMP_COOLDOWN && 
+        bot.y > mainPlatform.y) {
+        keys.ArrowUp = true;
+        botPlanner.lastJumpTime = currentTime;
+        botPlanner.recoveryAttempts++;
+    }
+    
+    // Emergency direction change if stuck
+    if (botPlanner.recoveryAttempts > CONFIG.MAX_RECOVERY_ATTEMPTS) {
+        botPlanner.lastMoveDirection = botPlanner.lastMoveDirection === 'right' ? 'left' : 'right';
+        botPlanner.recoveryAttempts = 0;
+    }
+}
+
+/**
+ * Execute combat logic
+ */
+function executeCombat(bot, player, platforms) {
+    const distance = Math.abs(player.x - bot.x);
+    
+    // Check if in immediate danger
+    if (isInDanger(bot, player)) {
+        executeEvasion(bot, player, platforms);
+        return;
+    }
+    
+    // Choose combat range based on situation
+    if (distance < 100) {
+        executeCloseCombat(bot, player, platforms);
+    } else {
+        executeRangedCombat(bot, player, platforms);
+    }
+}
+
+export { botPlanner, CONFIG };
