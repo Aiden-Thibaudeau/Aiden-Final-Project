@@ -292,10 +292,24 @@ export function initializeUI() {
         setupColorSelection(elements.player2ColorOptions, elements.player2Preview, 2);
     }
 
-    // Set up opponent type toggle
+// Set up opponent type toggle
     if (elements.opponentTypeToggle) {
+        const message = document.createElement('p');
+        message.textContent = '*Bot is only available on classic stage*';
+        message.style.fontSize = '0.8em';
+        message.style.color = 'lightGray';
+        message.style.textAlign = 'center';
+
+        // Insert the message *before* the toggle, then re-attach the event listener
+        elements.opponentTypeToggle.parentNode.insertBefore(message, elements.opponentTypeToggle);
+        
         elements.opponentTypeToggle.addEventListener('change', (e) => {
-            isBot = e.target.checked;
+            if (selectedStage !== 'classic') {
+                isBot = false; // Force to Player 2
+                e.target.checked = false; // Ensure toggle is visually set to Player 2
+            } else {
+                isBot = e.target.checked; // Allow changes in classic mode
+            }
             if (elements.player2Title) {
                 elements.player2Title.textContent = isBot ? 'Bot' : 'Player 2';
             }
@@ -322,6 +336,9 @@ export function initializeUI() {
 /**
  * Set up stage selection
  */
+/**
+ * Set up stage selection
+ */
 function setupStageSelection() {
     // Draw initial previews
     elements.stageOptions.forEach(option => {
@@ -331,7 +348,6 @@ function setupStageSelection() {
             drawStagePreview(canvas, stageName);
         }
     });
-
     // Set up click handlers
     elements.stageOptions.forEach(option => {
         option.addEventListener('click', () => {
@@ -342,6 +358,11 @@ function setupStageSelection() {
             // Update selected stage
             selectedStage = option.dataset.stage;
             console.log('Selected stage:', selectedStage);
+
+            // Trigger opponent type lock if needed
+            if (elements.opponentTypeToggle) {
+                elements.opponentTypeToggle.dispatchEvent(new Event('change')); // Manually trigger the toggle's event listener
+            }
         });
     });
 }

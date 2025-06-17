@@ -76,6 +76,20 @@ export function initializeControls(player1, player2) {
 }
 
 /**
+ * Function to make bot jump - called directly from bot logic
+ */
+export function makeBotJump(bot) {
+    if (bot.jumpsLeft > 0) {
+        bot.dy = -bot.jumpStrength;
+        bot.jumping = true;
+        bot.grounded = false;
+        bot.jumpsLeft--;
+        bot.stretchFactor = 1.3;
+        console.log('Bot jumped with strength:', bot.jumpStrength);
+    }
+}
+
+/**
  * Reset all key states to false
  */
 export function resetKeyStates() {
