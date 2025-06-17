@@ -1,94 +1,73 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Brute Force Password Cracker</title>
-    <style>
-        body { font-family: Arial, sans-serif; text-align: center; }
-        #output { white-space: pre-wrap; font-family: monospace; }
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>2D Fighting Game</title>
+  <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-    <h1>Brute Force Password Cracker</h1>
-    <input type="text" id="target" placeholder="Enter password to crack">
-    <button onclick="startCracking()">Start</button>
-    <p id="status">Attempts: 0</p>
-    <p id="time">Elapsed Time: 0s</p>
-    <p id="output"></p>
     
-    <script>
-        let startTime, attempts = 0;
-        let numWorker, charWorker;
+  <canvas id="gameCanvas"></canvas>  <div id="characterSelectScreen">
+    <div class="screen-content">
+      <h2 class="character-select-title">Choose Your Characters!</h2>
+      
+      <div class="player-selection-container">
+        <div class="player-section">
+          <h3 class="player-title">Player 1</h3>
+          <div id="player1ColorOptions" class="character-grid"></div>
+          <div id="player1Preview" class="player-preview"></div>
+        </div>
 
-        function startCracking() {
-            const target = document.getElementById('target').value;
-            if (!target) return alert('Enter a password to crack!');
-            
-            attempts = 0;
-            startTime = performance.now();
-            document.getElementById('status').innerText = "Attempts: 0";
-            document.getElementById('time').innerText = "Elapsed Time: 0s";
-            document.getElementById('output').innerText = "Cracking...";
-            
-            // Initialize web workers
-            numWorker = new Worker(URL.createObjectURL(new Blob([`(${numberCrackerWorker.toString()})()`], { type: 'application/javascript' })));
-            charWorker = new Worker(URL.createObjectURL(new Blob([`(${charCrackerWorker.toString()})()`], { type: 'application/javascript' })));
-            
-            numWorker.onmessage = charWorker.onmessage = function(e) {
-                attempts += e.data.attempts;
-                document.getElementById('status').innerText = `Attempts: ${attempts.toLocaleString()}`;
-                document.getElementById('time').innerText = `Elapsed Time: ${(performance.now() - startTime) / 1000}s`;
-                
-                if (e.data.found) {
-                    document.getElementById('output').innerText = `Password Found: ${e.data.password}`;
-                    numWorker.terminate();
-                    charWorker.terminate();
-                }
-            };
-            
-            numWorker.postMessage(target);
-            charWorker.postMessage(target);
-        }
+        <div class="opponent-type-toggle">
+          <h3>Opponent Type</h3>
+          <div class="toggle-switch">
+            <input type="checkbox" id="opponentTypeToggle">
+            <label for="opponentTypeToggle" class="toggle-label">
+              <span class="toggle-option">Player 2</span>
+              <span class="toggle-slider"></span>
+              <span class="toggle-option">Bot</span>
+            </label>
+          </div>
+        </div>
 
-        function numberCrackerWorker() {
-            onmessage = function(e) {
-                const target = e.data;
-                let attempts = 0;
-                let guess = "";
-                while (true) {
-                    guess = (attempts++).toString();
-                    if (guess === target) {
-                        postMessage({ found: true, password: guess, attempts });
-                        break;
-                    }
-                    if (attempts % 1000000 === 0) postMessage({ attempts });
-                }
-            };
-        }
+        <div class="player-section">
+          <h3 class="player-title" id="player2Title">Player 2</h3>
+          <div id="player2ColorOptions"></div>
+          <div id="player2Preview" class="player-preview"></div>
+        </div>
+      </div>
 
-        function charCrackerWorker() {
-            onmessage = function(e) {
-                const target = e.data;
-                let attempts = 0;
-                const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()-";
-                let guess = "";
-                function generateCombination(length) {
-                    let res = "";
-                    for (let i = 0; i < length; i++) res += chars[Math.floor(Math.random() * chars.length)];
-                    return res;
-                }
-                while (true) {
-                    guess = generateCombination(target.length);
-                    attempts++;
-                    if (guess === target) {
-                        postMessage({ found: true, password: guess, attempts });
-                        break;
-                    }
-                    if (attempts % 1000000 === 0) postMessage({ attempts });
-                }
-            };
-        }
-    </script>
+      <div class="stage-selection-container">
+        <h3 class="stage-select-title">Select Stage</h3>
+        <div class="stage-grid">        <div class="stage-option selected" data-stage="classic">
+          <canvas class="stage-preview" width="150" height="100"></canvas>
+          <div class="stage-name">Classic</div>
+        </div>
+        <div class="stage-option" data-stage="floating">
+          <canvas class="stage-preview" width="150" height="100"></canvas>
+          <div class="stage-name">Floating</div>
+        </div>
+        <div class="stage-option" data-stage="challenge">
+          <canvas class="stage-preview" width="150" height="100"></canvas>
+          <div class="stage-name">Challenge</div>
+        </div>
+      </div>
+    </div>
+    
+    <button id="startGameBtn">Start Game</button>
+  </div>
+
+  <div id="gameUI" style="display: none;">
+    <div id="player1UI" style="position: absolute; top: 35px; left: 20px;">
+      <div id="player1Stock" class="stock-container player1"></div>
+      <div id="player1Percent" style="text-align: center; font-size: 20px; font-weight: bold; color: white; margin-top: 5px;"></div>
+    </div>
+    
+    <div id="player2UI" style="position: absolute; top: 35px; right: 20px;">
+      <div id="player2Stock" class="stock-container player2"></div>
+      <div id="player2Percent" style="text-align: center; font-size: 20px; font-weight: bold; color: white; margin-top: 5px;"></div>
+    </div>  </div>
+    <script type="module" src="js/main.js"></script>
 </body>
 </html>
