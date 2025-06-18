@@ -3,7 +3,10 @@ import {
     handlePunching, 
     shootProjectile, 
     updateProjectiles,
-    projectiles 
+    projectiles, 
+    updateParticles, 
+    renderParticles,
+    particles
 } from './combat.js';
 import { 
     createPlayer, 
@@ -176,8 +179,9 @@ export function restartGame() {
     player1.knockbackMultiplier = 1;
     player2.knockbackMultiplier = 1;
     
-    // Clear any existing projectiles
+    // Clear any existing projectiles and particles
     projectiles.length = 0;
+    particles.length = 0;
     
     // Reset key states
     resetKeyStates();
@@ -282,6 +286,9 @@ function updateGame() {
     
     updateProjectiles(player1, player2);
     
+    // Update particle effects
+    updateParticles();
+    
     // Update UI
     updatePercentDisplay(player1, true);
     updatePercentDisplay(player2, false);
@@ -311,11 +318,21 @@ function render() {
     drawProjectileCharging(ctx, player2);
     drawProjectiles(ctx, projectiles);
     
+    // Render particle effects (after game objects but before UI)
+    renderParticles(ctx);
+    
     // Draw UI elements last to ensure they're on top
     updateStockDisplay(player1, true);
     updateStockDisplay(player2, false);
     updatePercentDisplay(player1, true);
     updatePercentDisplay(player2, false);
+    
+    // Debug: Show particle count (optional - remove in production)
+    if (particles.length > 0) {
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+        ctx.font = '14px Arial';
+        ctx.fillText(`Particles: ${particles.length}`, 10, elements.canvas.height - 10);
+    }
     
     if (gameOver) {
         drawWinnerText(ctx, player1);
